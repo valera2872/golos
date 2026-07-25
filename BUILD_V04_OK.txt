@@ -1,0 +1,2 @@
+Golos 0.4 build validated by GitHub Actions run 30150071819.
+APK SHA-256: aef9509106c7b4860f36415691b283b46eb7ff7e036333a675f9412ad2abb182
