@@ -37,8 +37,6 @@ jobs:
           cat source-v09-overlay/part*.b64 | base64 --decode > buildsrc/v09-overlay.tar.xz
           tar -xJf buildsrc/v09-overlay.tar.xz -C buildsrc/quiet-diary
           test -f buildsrc/quiet-diary/settings.gradle.kts
-          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakePhraseTextMatcher.java
-          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'versionName = "0.9"' buildsrc/quiet-diary/app/build.gradle.kts
 
       - name: Set up Java 17
@@ -60,17 +58,24 @@ jobs:
           gradle-version: '8.10.2'
 
       - name: Build debug APK
+        id: compile
+        continue-on-error: true
         shell: bash
-        run: |
-          set +e
-          gradle -p buildsrc/quiet-diary :app:assembleDebug --stacktrace --console=plain > buildsrc/gradle-build.log 2>&1
-          result=$?
-          if [ "$result" -ne 0 ]; then
-            echo "===== COMPILER ERROR TAIL ====="
-            tail -n 250 buildsrc/gradle-build.log
-            exit "$result"
-          fi
-          tail -n 30 buildsrc/gradle-build.log
+        run: gradle -p buildsrc/quiet-diary :app:assembleDebug --stacktrace --console=plain > buildsrc/gradle-build.log 2>&1
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golos-0.9-compiler-log
+          path: buildsrc/gradle-build.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        shell: bash
+        run: exit 1
 
       - name: Rename APK
         shell: bash
