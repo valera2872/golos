@@ -22,11 +22,15 @@ jobs:
       - name: Restore Android project
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p buildsrc
           cat source-v04/part*.b64 | base64 --decode > buildsrc/golos-source.zip
           unzip -q buildsrc/golos-source.zip -d buildsrc
+          cat source-v05-patch/part*.b64 | base64 --decode | gunzip > buildsrc/v05.patch
+          git apply -p2 --directory=buildsrc buildsrc/v05.patch
           test -f buildsrc/quiet-diary/settings.gradle.kts
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
+          grep -q 'versionName = "0.5"' buildsrc/quiet-diary/app/build.gradle.kts
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -52,12 +56,12 @@ jobs:
 
       - name: Rename APK
         shell: bash
-        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.4-debug.apk
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.5-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.4-debug-apk
-          path: golos-0.4-debug.apk
+          name: golos-0.5-debug-apk
+          path: golos-0.5-debug.apk
           if-no-files-found: error
           retention-days: 30
