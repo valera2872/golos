@@ -34,8 +34,8 @@ jobs:
           unzip -qo buildsrc/v07-overlay.zip -d buildsrc/quiet-diary
           cat source-v08-overlay/part*.b64 | base64 --decode > buildsrc/v08-overlay.zip
           unzip -qo buildsrc/v08-overlay.zip -d buildsrc/quiet-diary
-          cat source-v09-patch/part*.b64 | base64 --decode | gunzip > buildsrc/v09.patch
-          git apply -p2 --directory=buildsrc/quiet-diary buildsrc/v09.patch
+          cat source-v09-overlay/part*.b64 | base64 --decode > buildsrc/v09-overlay.tar.xz
+          tar -xJf buildsrc/v09-overlay.tar.xz -C buildsrc/quiet-diary
           test -f buildsrc/quiet-diary/settings.gradle.kts
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakePhraseTextMatcher.java
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
