@@ -36,8 +36,10 @@ jobs:
           unzip -qo buildsrc/v08-overlay.zip -d buildsrc/quiet-diary
           cat source-v09-overlay/part*.b64 | base64 --decode > buildsrc/v09-overlay.tar.xz
           tar -xJf buildsrc/v09-overlay.tar.xz -C buildsrc/quiet-diary
+          cat source-v09-hotfix/part*.b64 | base64 --decode > buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
           test -f buildsrc/quiet-diary/settings.gradle.kts
           grep -q 'versionName = "0.9"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'runBlocking' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
