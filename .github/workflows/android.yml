@@ -29,7 +29,7 @@ jobs:
           cat source-v05-patch/part*.b64 | base64 --decode | gunzip > buildsrc/v05.patch
           git apply -p2 --directory=buildsrc buildsrc/v05.patch
           cat source-v06-patch/part*.b64 | base64 --decode | gunzip > buildsrc/v06.patch
-          (cd buildsrc/quiet-diary && git apply ../v06.patch)
+          git apply --directory=buildsrc/quiet-diary buildsrc/v06.patch
           test -f buildsrc/quiet-diary/settings.gradle.kts
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakePhraseTester.java
