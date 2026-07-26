@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore complete Android project
+      - name: Restore Golos 0.16 project
         id: restore
         continue-on-error: true
         shell: bash
@@ -43,17 +43,21 @@ jobs:
           PY
             base64 --decode source-v15-hotfix/v15-hotfix.patch.gz.b64 | gunzip > buildsrc/v15-hotfix.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-hotfix.patch
+            base64 --decode source-v16/v15-to-v16.patch.gz.b64 | gunzip > buildsrc/v15-to-v16.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-to-v16.patch
             test -f buildsrc/quiet-diary/settings.gradle.kts
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveActivity.java
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
-            grep -q 'versionName = "0.15"' buildsrc/quiet-diary/app/build.gradle.kts
+            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
+            grep -q 'versionName = "0.16"' buildsrc/quiet-diary/app/build.gradle.kts
+            grep -q 'stop_night_phrase' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
+            grep -q 'READ_NON_BLOCKING' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
           } > buildsrc/restore.log 2>&1
 
       - name: Upload restore log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.15-restore-log
+          name: golos-0.16-restore-log
           path: buildsrc/restore.log
           if-no-files-found: error
           retention-days: 7
@@ -89,7 +93,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.15-compiler-log
+          name: golos-0.16-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -100,21 +104,21 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.15-debug.apk
-          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk golos-0.15-release-unsigned.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.16-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk golos-0.16-release-unsigned.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.15-debug-apk
-          path: golos-0.15-debug.apk
+          name: golos-0.16-debug-apk
+          path: golos-0.16-debug.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload unsigned release APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.15-release-unsigned-apk
-          path: golos-0.15-release-unsigned.apk
+          name: golos-0.16-release-unsigned-apk
+          path: golos-0.16-release-unsigned.apk
           if-no-files-found: error
           retention-days: 30
