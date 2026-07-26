@@ -41,6 +41,8 @@ jobs:
                   raise RuntimeError(f'ZIP CRC error: {bad}')
               zf.extractall(target)
           PY
+            base64 --decode source-v15-hotfix/v15-hotfix.patch.gz.b64 | gunzip > buildsrc/v15-hotfix.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-hotfix.patch
             base64 --decode source-v16/v15-to-v16.patch.gz.b64 | gunzip > buildsrc/v15-to-v16.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-to-v16.patch
             test -f buildsrc/quiet-diary/settings.gradle.kts
