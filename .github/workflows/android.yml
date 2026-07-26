@@ -62,8 +62,7 @@ jobs:
             unexpected_rejects="$(find buildsrc/quiet-diary -name '*.rej' ! -path '*/README.md.rej' -print)"
             test -z "$unexpected_rejects"
             rm -f buildsrc/quiet-diary/README.md.rej
-            base64 --decode source-v19-hotfix/nav-attributes.patch.gz.b64 | gunzip > buildsrc/v19-nav-hotfix.patch
-            patch -p1 -d buildsrc/quiet-diary < buildsrc/v19-nav-hotfix.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v19-hotfix/nav-attributes.patch
 
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LucidPracticeActivity.java
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LucidReminderReceiver.java
