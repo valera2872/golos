@@ -20,16 +20,48 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Restore complete Android project
+        id: restore
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set -o pipefail
           mkdir -p buildsrc/quiet-diary
-          cat source-v15/part*.b64 | base64 --decode > buildsrc/golos-source-0.15.zip
-          unzip -q buildsrc/golos-source-0.15.zip -d buildsrc/quiet-diary
-          test -f buildsrc/quiet-diary/settings.gradle.kts
-          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveActivity.java
-          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
-          grep -q 'versionName = "0.15"' buildsrc/quiet-diary/app/build.gradle.kts
+          {
+            echo '=== source files ==='
+            find source-v15 -maxdepth 1 -type f -name 'part*.b64' -printf '%f %s bytes\n' | sort
+            echo '=== concatenate and decode ==='
+            cat source-v15/part*.b64 > buildsrc/golos-source-0.15.b64
+            wc -c buildsrc/golos-source-0.15.b64
+            base64 --decode buildsrc/golos-source-0.15.b64 > buildsrc/golos-source-0.15.zip
+            echo "base64_exit=$?"
+            sha256sum buildsrc/golos-source-0.15.zip
+            echo 'expected 8df847f96aac840048c1014321c9db2608aaa62b7ed7d3de135449ee92e1e346'
+            echo '=== zip test ==='
+            unzip -t buildsrc/golos-source-0.15.zip
+            echo "zip_test_exit=$?"
+            echo '=== extraction ==='
+            unzip -qo buildsrc/golos-source-0.15.zip -d buildsrc/quiet-diary
+            echo "unzip_exit=$?"
+            find buildsrc/quiet-diary -maxdepth 3 -type f | sort | head -50
+            test -f buildsrc/quiet-diary/settings.gradle.kts
+            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveActivity.java
+            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
+            grep -q 'versionName = "0.15"' buildsrc/quiet-diary/app/build.gradle.kts
+            echo 'RESTORE_OK'
+          } > buildsrc/restore.log 2>&1
+
+      - name: Upload restore log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golos-0.15-restore-log
+          path: buildsrc/restore.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after restore log upload
+        if: steps.restore.outcome == 'failure'
+        run: exit 1
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -63,7 +95,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Fail after log upload
+      - name: Fail after compiler log upload
         if: steps.compile.outcome == 'failure'
         run: exit 1
 
