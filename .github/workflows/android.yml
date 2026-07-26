@@ -24,25 +24,27 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           mkdir -p buildsrc/quiet-diary
           {
             echo '=== source files ==='
             find source-v15 -maxdepth 1 -type f -name 'part*.b64' -printf '%f %s bytes\n' | sort
-            echo '=== concatenate and decode ==='
             cat source-v15/part*.b64 > buildsrc/golos-source-0.15.b64
-            wc -c buildsrc/golos-source-0.15.b64
             base64 --decode buildsrc/golos-source-0.15.b64 > buildsrc/golos-source-0.15.zip
-            echo "base64_exit=$?"
             sha256sum buildsrc/golos-source-0.15.zip
-            echo 'expected 8df847f96aac840048c1014321c9db2608aaa62b7ed7d3de135449ee92e1e346'
-            echo '=== zip test ==='
-            unzip -t buildsrc/golos-source-0.15.zip
-            echo "zip_test_exit=$?"
-            echo '=== extraction ==='
-            unzip -qo buildsrc/golos-source-0.15.zip -d buildsrc/quiet-diary
-            echo "unzip_exit=$?"
-            find buildsrc/quiet-diary -maxdepth 3 -type f | sort | head -50
+            python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          archive = Path('buildsrc/golos-source-0.15.zip')
+          target = Path('buildsrc/quiet-diary')
+          with ZipFile(archive) as zf:
+              bad = zf.testzip()
+              if bad is not None:
+                  raise RuntimeError(f'ZIP CRC error: {bad}')
+              zf.extractall(target)
+              print(f'extracted_files={len(zf.infolist())}')
+          PY
             test -f buildsrc/quiet-diary/settings.gradle.kts
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveActivity.java
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
