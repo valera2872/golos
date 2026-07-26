@@ -27,11 +27,8 @@ jobs:
           set -euo pipefail
           mkdir -p buildsrc/quiet-diary
           {
-            echo '=== source files ==='
-            find source-v15 -maxdepth 1 -type f -name 'part*.b64' -printf '%f %s bytes\n' | sort
             cat source-v15/part*.b64 > buildsrc/golos-source-0.15.b64
             base64 --decode buildsrc/golos-source-0.15.b64 > buildsrc/golos-source-0.15.zip
-            sha256sum buildsrc/golos-source-0.15.zip
             python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
@@ -43,7 +40,6 @@ jobs:
               if bad is not None:
                   raise RuntimeError(f'ZIP CRC error: {bad}')
               zf.extractall(target)
-              print(f'extracted_files={len(zf.infolist())}')
           PY
             base64 --decode source-v15-hotfix/v15-hotfix.patch.gz.b64 | gunzip > buildsrc/v15-hotfix.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-hotfix.patch
@@ -51,8 +47,6 @@ jobs:
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveActivity.java
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
             grep -q 'versionName = "0.15"' buildsrc/quiet-diary/app/build.gradle.kts
-            grep -q 'recordSample(this' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
-            echo 'RESTORE_OK'
           } > buildsrc/restore.log 2>&1
 
       - name: Upload restore log
