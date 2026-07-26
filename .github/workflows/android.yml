@@ -41,9 +41,14 @@ jobs:
           tar -xJf buildsrc/v10-overlay.tar.xz -C buildsrc/quiet-diary
           cat source-v11-overlay/part*.b64 | base64 --decode > buildsrc/v11-overlay.tar.xz
           tar -xJf buildsrc/v11-overlay.tar.xz -C buildsrc/quiet-diary
+          cat source-v12-overlay/part*.b64 | base64 --decode > buildsrc/v12-overlay.tar.xz
+          tar -xJf buildsrc/v12-overlay.tar.xz -C buildsrc/quiet-diary
           test -f buildsrc/quiet-diary/settings.gradle.kts
-          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/HapticSignal.java
-          grep -q 'versionName = "0.11"' buildsrc/quiet-diary/app/build.gradle.kts
+          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/DiagnosticsStore.java
+          grep -q 'versionName = "0.12"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'MODE_RECOVERING' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'startWatchdog' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'Проверить готовность перед сном' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
           grep -q 'VibratorManager' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/HapticSignal.java
           grep -q 'fast_start_enabled' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'runBlocking' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
@@ -77,7 +82,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.11-compiler-log
+          name: golos-0.12-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -89,12 +94,12 @@ jobs:
 
       - name: Rename APK
         shell: bash
-        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.11-debug.apk
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.12-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.11-debug-apk
-          path: golos-0.11-debug.apk
+          name: golos-0.12-debug-apk
+          path: golos-0.12-debug.apk
           if-no-files-found: error
           retention-days: 30
