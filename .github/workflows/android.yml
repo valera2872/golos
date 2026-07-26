@@ -37,8 +37,12 @@ jobs:
           cat source-v09-overlay/part*.b64 | base64 --decode > buildsrc/v09-overlay.tar.xz
           tar -xJf buildsrc/v09-overlay.tar.xz -C buildsrc/quiet-diary
           cp source-v09-hotfix/LiveCommandRecognizer.kt buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
+          cat source-v10-overlay/part*.b64 | base64 --decode > buildsrc/v10-overlay.tar.xz
+          tar -xJf buildsrc/v10-overlay.tar.xz -C buildsrc/quiet-diary
           test -f buildsrc/quiet-diary/settings.gradle.kts
-          grep -q 'versionName = "0.9"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.10"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'fast_start_enabled' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'sound_volume' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/MainActivity.java
           grep -q 'runBlocking' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
           test "$(grep -c '^package ' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt)" -eq 1
 
@@ -70,7 +74,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.9-compiler-log
+          name: golos-0.10-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -82,12 +86,12 @@ jobs:
 
       - name: Rename APK
         shell: bash
-        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.9-debug.apk
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.10-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.9-debug-apk
-          path: golos-0.9-debug.apk
+          name: golos-0.10-debug-apk
+          path: golos-0.10-debug.apk
           if-no-files-found: error
           retention-days: 30
