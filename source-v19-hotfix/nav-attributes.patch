@@ -1,0 +1,27 @@
+--- a/app/src/main/res/layout/view_bottom_navigation.xml
++++ b/app/src/main/res/layout/view_bottom_navigation.xml
+@@ -16,20 +16,20 @@
+         android:id="@+id/navNightButton"
+         android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+         android:text="Ночь" android:textAllCaps="false" android:textSize="12sp"
+-        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" app:insetTop="0dp" app:insetBottom="0dp" />
++        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" />
+     <com.google.android.material.button.MaterialButton
+         android:id="@+id/navJournalButton"
+         android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+         android:text="Дневник" android:textAllCaps="false" android:textSize="12sp"
+-        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" app:insetTop="0dp" app:insetBottom="0dp" />
++        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" />
+     <com.google.android.material.button.MaterialButton
+         android:id="@+id/navDreamsButton"
+         android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+         android:text="Сны" android:textAllCaps="false" android:textSize="12sp"
+-        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" app:insetTop="0dp" app:insetBottom="0dp" />
++        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" />
+     <com.google.android.material.button.MaterialButton
+         android:id="@+id/navPracticeButton"
+         android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+         android:text="Практика" android:textAllCaps="false" android:textSize="12sp"
+-        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" app:insetTop="0dp" app:insetBottom="0dp" />
++        app:backgroundTint="@android:color/transparent" app:cornerRadius="16dp" />
+ </LinearLayout>
