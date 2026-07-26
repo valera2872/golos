@@ -50,6 +50,8 @@ jobs:
             unexpected_rejects="$(find buildsrc/quiet-diary -name '*.rej' ! -path '*/README.md.rej' -print)"
             test -z "$unexpected_rejects"
             rm -f buildsrc/quiet-diary/README.md.rej
+            base64 --decode source-v17-hotfix/dream-category.patch.gz.b64 | gunzip > buildsrc/v17-dream-category.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v17-dream-category.patch
             test -f buildsrc/quiet-diary/settings.gradle.kts
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/DreamHubActivity.java
             test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/DreamTools.java
@@ -58,6 +60,7 @@ jobs:
             grep -q 'REQUIRED_DREAM_SAMPLES' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
             grep -q 'recordDreamSample' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
             grep -q 'candidateLooksLikeDream' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+            grep -q 'normalized.equals("сны")' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/Entry.java
           } > buildsrc/restore.log 2>&1
 
       - name: Upload restore log
