@@ -49,6 +49,7 @@ jobs:
           tar -xJf buildsrc/v13-overlay.tar.xz -C buildsrc/quiet-diary
           cat source-v14-patch/part*.b64 | base64 --decode | gunzip > buildsrc/v14.patch
           patch --batch --forward -p5 -d buildsrc/quiet-diary < buildsrc/v14.patch || true
+          sed -i 's/materialButtonTextButtonStyle/materialButtonOutlinedStyle/' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
           test -f buildsrc/quiet-diary/settings.gradle.kts
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
           test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/StopCommandTester.java
