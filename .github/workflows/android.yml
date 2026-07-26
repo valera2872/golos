@@ -47,15 +47,16 @@ jobs:
           patch -p1 -d buildsrc/quiet-diary < buildsrc/v12-mainactivity.patch
           cat source-v13-overlay/part*.b64 | base64 --decode > buildsrc/v13-overlay.tar.xz
           tar -xJf buildsrc/v13-overlay.tar.xz -C buildsrc/quiet-diary
+          cat source-v14-patch/part*.b64 | base64 --decode | gunzip > buildsrc/v14.patch
+          patch -p2 -d buildsrc/quiet-diary < buildsrc/v14.patch
           test -f buildsrc/quiet-diary/settings.gradle.kts
-          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/DiagnosticsActivity.java
-          grep -q 'versionName = "0.13"' buildsrc/quiet-diary/app/build.gradle.kts
-          grep -q 'REQUIRED_FAST_SAMPLES' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
-          grep -q 'recordFastSample' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
-          grep -q 'STOP_NIGHT' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
-          grep -q 'stopNightModeByVoice' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
-          grep -q 'openDiagnosticsButton' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
-          grep -q 'loadAllForDetection' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
+          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/StopCommandTester.java
+          grep -q 'versionName = "0.14"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'Ночь стоп' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+          grep -q 'testStopCommandButton' buildsrc/quiet-diary/app/src/main/res/layout/activity_diagnostics.xml
+          grep -q 'prepareRecognitionSilently' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/MainActivity.java
+          grep -q 'VoiceCommandMatcher.isStopNight' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
           grep -q 'runBlocking' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
           test "$(grep -c '^package ' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt)" -eq 1
 
@@ -87,7 +88,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.13-compiler-log
+          name: golos-0.14-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -99,12 +100,12 @@ jobs:
 
       - name: Rename APK
         shell: bash
-        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.13-debug.apk
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.14-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.13-debug-apk
-          path: golos-0.13-debug.apk
+          name: golos-0.14-debug-apk
+          path: golos-0.14-debug.apk
           if-no-files-found: error
           retention-days: 30
