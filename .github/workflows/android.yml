@@ -69,6 +69,7 @@ jobs:
             echo 'bd53567dae1732465e0992ed8d376c8953e7107a55d9a6931f6370de5ccc37b5  buildsrc/v19-to-v20.patch.gz.b64' | sha256sum -c -
             base64 --decode buildsrc/v19-to-v20.patch.gz.b64 | gunzip > buildsrc/v19-to-v20.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v19-to-v20.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/theme-background.patch
 
             test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
             grep -q 'versionName = "0.20"' buildsrc/quiet-diary/app/build.gradle.kts
