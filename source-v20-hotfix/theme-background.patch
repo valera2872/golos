@@ -1,0 +1,14 @@
+diff --git a/app/src/main/res/values/themes.xml b/app/src/main/res/values/themes.xml
+index 564d64d..8363820 100644
+--- a/app/src/main/res/values/themes.xml
++++ b/app/src/main/res/values/themes.xml
+@@ -9,7 +9,7 @@
+         <item name="colorSecondary">@color/qd_dream</item>
+         <item name="colorOnSecondary">@color/qd_background</item>
+         <item name="colorSurface">@color/qd_surface</item>
+         <item name="colorOnSurface">@color/qd_text</item>
+-        <item name="colorBackground">@color/qd_background</item>
++        <item name="android:colorBackground">@color/qd_background</item>
+         <item name="android:textColorPrimary">@color/qd_text</item>
+         <item name="android:textColorSecondary">@color/qd_muted</item>
+         <item name="android:fontFamily">sans</item>

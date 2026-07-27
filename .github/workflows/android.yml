@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Golos 0.19 project
+      - name: Restore Golos 0.20 project
         id: restore
         continue-on-error: true
         shell: bash
@@ -64,28 +64,31 @@ jobs:
             rm -f buildsrc/quiet-diary/README.md.rej
             patch -p1 -d buildsrc/quiet-diary < source-v19-hotfix/nav-attributes.patch
 
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LucidPracticeActivity.java
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LucidReminderReceiver.java
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/UiNavigation.java
-            test -f buildsrc/quiet-diary/app/src/main/res/layout/view_bottom_navigation.xml
-            test -f buildsrc/quiet-diary/app/src/test/java/com/quietdiary/app/LucidPracticeToolsTest.java
-            grep -q 'versionName = "0.19"' buildsrc/quiet-diary/app/build.gradle.kts
-            grep -q 'UiNavigation.bind' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/MainActivity.java
-            grep -q 'navPracticeButton' buildsrc/quiet-diary/app/src/main/res/layout/view_bottom_navigation.xml
-            grep -q 'entryRouteHint' buildsrc/quiet-diary/app/src/main/res/layout/activity_entry_detail.xml
-            grep -q 'archiveModeDescription' buildsrc/quiet-diary/app/src/main/res/layout/activity_archive.xml
-            grep -q 'night_hero_background' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            cat source-v20/chunk*.b64 > buildsrc/v19-to-v20.patch.gz.b64
+            test "$(wc -c < buildsrc/v19-to-v20.patch.gz.b64)" -eq 17872
+            echo 'bd53567dae1732465e0992ed8d376c8953e7107a55d9a6931f6370de5ccc37b5  buildsrc/v19-to-v20.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v19-to-v20.patch.gz.b64 | gunzip > buildsrc/v19-to-v20.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v19-to-v20.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/theme-background.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/time-normalization.patch
+            find buildsrc/quiet-diary -name '*.orig' -delete
+
+            test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+            grep -q 'versionName = "0.20"' buildsrc/quiet-diary/app/build.gradle.kts
+            grep -q 'MODE_SPEAKING' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+            grep -q 'isTimeRequest' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
+            grep -q 'Command.TIME' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LiveCommandRecognizer.kt
+            grep -q 'morningDreamCount' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            grep -q 'ic_night' buildsrc/quiet-diary/app/src/main/res/layout/view_bottom_navigation.xml
+            grep -q '#080D19' buildsrc/quiet-diary/app/src/main/res/values/colors.xml
             grep -q 'android:label="Golos"' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
-            grep -q 'KEY_PAUSED' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LucidPracticeStore.java
-            grep -q 'setAndAllowWhileIdle' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/LucidReminderScheduler.java
-            grep -q 'RECEIVE_BOOT_COMPLETED' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
           } > buildsrc/restore.log 2>&1
 
       - name: Upload restore log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.19-restore-log
+          name: golos-0.20-restore-log
           path: buildsrc/restore.log
           if-no-files-found: error
           retention-days: 7
@@ -121,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.19-compiler-log
+          name: golos-0.20-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -132,21 +135,21 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.19-debug.apk
-          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk golos-0.19-release-unsigned.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.20-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk golos-0.20-release-unsigned.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.19-debug-apk
-          path: golos-0.19-debug.apk
+          name: golos-0.20-debug-apk
+          path: golos-0.20-debug.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload unsigned release APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.19-release-unsigned-apk
-          path: golos-0.19-release-unsigned.apk
+          name: golos-0.20-release-unsigned-apk
+          path: golos-0.20-release-unsigned.apk
           if-no-files-found: error
           retention-days: 30
