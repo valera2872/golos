@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Golos 0.21 project
+      - name: Restore Golos 0.22 project
         id: restore
         continue-on-error: true
         shell: bash
@@ -78,16 +78,22 @@ jobs:
             base64 --decode buildsrc/v20-to-v21.patch.gz.b64 | gunzip > buildsrc/v20-to-v21.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v20-to-v21.patch
             patch -p1 -d buildsrc/quiet-diary < source-v21-hotfix/text-button-style.patch
+
+            cat source-v22/chunk*.b64 > buildsrc/v21-to-v22.patch.gz.b64
+            test "$(wc -c < buildsrc/v21-to-v22.patch.gz.b64)" -eq 13728
+            echo 'f46545b53acfc955802ef89a128796f9113a218fbb996c03b687e0725f055457  buildsrc/v21-to-v22.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v21-to-v22.patch.gz.b64 | gunzip > buildsrc/v21-to-v22.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v21-to-v22.patch
             find buildsrc/quiet-diary -name '*.orig' -delete
 
             test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
-            grep -q 'versionName = "0.21"' buildsrc/quiet-diary/app/build.gradle.kts
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/OnboardingActivity.java
-            grep -q 'БЕСКОНТАКТНЫЙ НОЧНОЙ ДНЕВНИК' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/OnboardingActivity.java
-            grep -q 'REQUIRED_TIME_SAMPLES' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
-            grep -q 'startTimeTextVerification' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
-            grep -q 'FAST_END_SILENCE_BLOCKS' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
-            grep -q 'openHelpButton' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            grep -q 'versionName = "0.22"' buildsrc/quiet-diary/app/build.gradle.kts
+            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightClockView.java
+            grep -q 'onboarding_v22_seen' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/OnboardingActivity.java
+            grep -q 'active_night_started_at' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+            grep -q 'morningTimeCount' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            grep -q 'Проверка занимает около 4 секунд' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            grep -q 'Контрольная фраза с места сна' buildsrc/quiet-diary/app/src/main/res/layout/activity_settings.xml
             grep -q 'android:label="Golos"' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
           } > buildsrc/restore.log 2>&1
 
@@ -95,7 +101,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.21-restore-log
+          name: golos-0.22-restore-log
           path: buildsrc/restore.log
           if-no-files-found: error
           retention-days: 7
@@ -131,7 +137,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.21-compiler-log
+          name: golos-0.22-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -142,21 +148,21 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.21-debug.apk
-          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk golos-0.21-release-unsigned.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk golos-0.22-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk golos-0.22-release-unsigned.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.21-debug-apk
-          path: golos-0.21-debug.apk
+          name: golos-0.22-debug-apk
+          path: golos-0.22-debug.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload unsigned release APK
         uses: actions/upload-artifact@v4
         with:
-          name: golos-0.21-release-unsigned-apk
-          path: golos-0.21-release-unsigned.apk
+          name: golos-0.22-release-unsigned-apk
+          path: golos-0.22-release-unsigned.apk
           if-no-files-found: error
           retention-days: 30
