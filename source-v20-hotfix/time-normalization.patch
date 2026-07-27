@@ -1,0 +1,24 @@
+diff --git a/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java b/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
+--- a/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
++++ b/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
+@@ -59,14 +59,14 @@ public final class VoiceCommandMatcher {
+         String[] words = normalized.split(" ");
+         if (words.length > 5) return false;
+         if (normalized.startsWith("дневник ")) normalized = normalized.substring("дневник ".length()).trim();
+-        return normalized.equals("время")
+-                || normalized.equals("скажи время")
+-                || normalized.equals("подскажи время")
+-                || normalized.equals("который час")
+-                || normalized.equals("скажи который час")
+-                || normalized.equals("подскажи который час")
+-                || normalized.equals("сколько времени")
+-                || normalized.equals("сколько сейчас времени");
++        return normalized.equals(normalize("время"))
++                || normalized.equals(normalize("скажи время"))
++                || normalized.equals(normalize("подскажи время"))
++                || normalized.equals(normalize("который час"))
++                || normalized.equals(normalize("скажи который час"))
++                || normalized.equals(normalize("подскажи который час"))
++                || normalized.equals(normalize("сколько времени"))
++                || normalized.equals(normalize("сколько сейчас времени"));
+     }
