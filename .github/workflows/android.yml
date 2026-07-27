@@ -77,6 +77,7 @@ jobs:
             echo '4f0a90e9e724797f0ac504843e7196ca3e2a6793983dc6624cf1434c38986bec  buildsrc/v20-to-v21.patch.gz.b64' | sha256sum -c -
             base64 --decode buildsrc/v20-to-v21.patch.gz.b64 | gunzip > buildsrc/v20-to-v21.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v20-to-v21.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v21-hotfix/text-button-style.patch
             find buildsrc/quiet-diary -name '*.orig' -delete
 
             test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
