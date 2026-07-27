@@ -3,6 +3,8 @@ name: Export Golos 0.22 Source
 on:
   push:
     branches: [ agent/v0-22-1-voice-polish ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -73,5 +75,3 @@ jobs:
           path: buildsrc/quiet-diary
           if-no-files-found: error
           retention-days: 7
-
-# refresh export after opening PR
