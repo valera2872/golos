@@ -94,6 +94,14 @@ jobs:
         if: steps.restore.outcome == 'failure'
         run: exit 1
 
+      - name: Upload restored project snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: golos-0.19-restored-source
+          path: buildsrc/quiet-diary
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
