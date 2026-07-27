@@ -70,6 +70,7 @@ jobs:
             base64 --decode buildsrc/v19-to-v20.patch.gz.b64 | gunzip > buildsrc/v19-to-v20.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v19-to-v20.patch
             patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/theme-background.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/time-normalization.patch
             find buildsrc/quiet-diary -name '*.orig' -delete
 
             test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
