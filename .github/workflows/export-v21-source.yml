@@ -3,6 +3,8 @@ name: Export Golos 0.21 Source
 on:
   push:
     branches: [ agent/v0-22-polish-my-night ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
