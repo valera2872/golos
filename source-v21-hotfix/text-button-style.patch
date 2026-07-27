@@ -1,0 +1,22 @@
+diff -ruN golos21prehotfix/app/src/main/res/layout/activity_main.xml golos21src/app/src/main/res/layout/activity_main.xml
+--- golos21prehotfix/app/src/main/res/layout/activity_main.xml	2026-07-27 11:04:22.585435792 +0000
++++ golos21src/app/src/main/res/layout/activity_main.xml	2026-07-27 11:04:22.433435797 +0000
+@@ -417,7 +417,6 @@
+                     android:textSize="13sp" />
+ 
+                 <com.google.android.material.button.MaterialButton
+-                    style="?attr/materialButtonTextButtonStyle"
+                     android:layout_width="wrap_content"
+                     android:layout_height="wrap_content"
+                     android:layout_marginTop="7dp"
+diff -ruN golos21prehotfix/app/src/main/res/layout/activity_onboarding.xml golos21src/app/src/main/res/layout/activity_onboarding.xml
+--- golos21prehotfix/app/src/main/res/layout/activity_onboarding.xml	2026-07-27 11:04:22.585435792 +0000
++++ golos21src/app/src/main/res/layout/activity_onboarding.xml	2026-07-27 11:04:22.433435797 +0000
+@@ -139,7 +139,6 @@
+ 
+         <com.google.android.material.button.MaterialButton
+             android:id="@+id/onboardingSkipButton"
+-            style="?attr/materialButtonTextButtonStyle"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:layout_marginTop="6dp"
