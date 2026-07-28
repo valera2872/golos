@@ -1,8 +1,8 @@
 name: Export Nightseed 0.25.1 Source for 0.25.2
 
 on:
-  push:
-    branches: [ agent/v0-25-2-buffered-practice-voice ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
