@@ -1,0 +1,196 @@
+name: Build Nightseed 0.25 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.25 project
+        id: restore
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc/quiet-diary
+          {
+            cat source-v15/part*.b64 > buildsrc/golos-source-0.15.b64
+            base64 --decode buildsrc/golos-source-0.15.b64 > buildsrc/golos-source-0.15.zip
+            python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = Path('buildsrc/golos-source-0.15.zip')
+          target = Path('buildsrc/quiet-diary')
+          with ZipFile(archive) as zf:
+              bad = zf.testzip()
+              if bad is not None:
+                  raise RuntimeError(f'ZIP CRC error: {bad}')
+              zf.extractall(target)
+          PY
+            base64 --decode source-v15-hotfix/v15-hotfix.patch.gz.b64 | gunzip > buildsrc/v15-hotfix.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-hotfix.patch
+            base64 --decode source-v16/v15-to-v16.patch.gz.b64 | gunzip > buildsrc/v15-to-v16.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-to-v16.patch
+            cat source-v17-small/chunk*.b64 | base64 --decode | gunzip > buildsrc/v16-to-v17.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v16-to-v17.patch || true
+            unexpected_rejects="$(find buildsrc/quiet-diary -name '*.rej' ! -path '*/README.md.rej' -print)"
+            test -z "$unexpected_rejects"
+            rm -f buildsrc/quiet-diary/README.md.rej
+            base64 --decode source-v17-hotfix/dream-category.patch.gz.b64 | gunzip > buildsrc/v17-dream-category.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v17-dream-category.patch
+            cat source-v18-fix/chunk00a.b64 source-v18-fix/chunk00b.b64 source-v18/chunk01.b64 source-v18/chunk02.b64 source-v18/chunk03.b64 | base64 --decode | gunzip > buildsrc/v17-to-v18.patch
+            patch -p4 -d buildsrc/quiet-diary < buildsrc/v17-to-v18.patch
+            cat source-v19-small/chunk*.b64 > buildsrc/v18-to-v19.patch.gz.b64
+            test "$(wc -c < buildsrc/v18-to-v19.patch.gz.b64)" -eq 26852
+            echo 'e8414ae22784cf5e0d1e84de0297e37588bd5fe20f3a1e0d8876674d4bee1e78  buildsrc/v18-to-v19.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v18-to-v19.patch.gz.b64 | gunzip > buildsrc/v18-to-v19.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v18-to-v19.patch || true
+            unexpected_rejects="$(find buildsrc/quiet-diary -name '*.rej' ! -path '*/README.md.rej' -print)"
+            test -z "$unexpected_rejects"
+            rm -f buildsrc/quiet-diary/README.md.rej
+            patch -p1 -d buildsrc/quiet-diary < source-v19-hotfix/nav-attributes.patch
+            cat source-v20/chunk*.b64 > buildsrc/v19-to-v20.patch.gz.b64
+            test "$(wc -c < buildsrc/v19-to-v20.patch.gz.b64)" -eq 17872
+            echo 'bd53567dae1732465e0992ed8d376c8953e7107a55d9a6931f6370de5ccc37b5  buildsrc/v19-to-v20.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v19-to-v20.patch.gz.b64 | gunzip > buildsrc/v19-to-v20.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v19-to-v20.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/theme-background.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/time-normalization.patch
+            cat source-v21/chunk*.b64 > buildsrc/v20-to-v21.patch.gz.b64
+            test "$(wc -c < buildsrc/v20-to-v21.patch.gz.b64)" -eq 34028
+            echo '4f0a90e9e724797f0ac504843e7196ca3e2a6793983dc6624cf1434c38986bec  buildsrc/v20-to-v21.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v20-to-v21.patch.gz.b64 | gunzip > buildsrc/v20-to-v21.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v20-to-v21.patch
+            patch -p1 -d buildsrc/quiet-diary < source-v21-hotfix/text-button-style.patch
+            cat source-v22/chunk*.b64 > buildsrc/v21-to-v22.patch.gz.b64
+            test "$(wc -c < buildsrc/v21-to-v22.patch.gz.b64)" -eq 13728
+            echo 'f46545b53acfc955802ef89a128796f9113a218fbb996c03b687e0725f055457  buildsrc/v21-to-v22.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v21-to-v22.patch.gz.b64 | gunzip > buildsrc/v21-to-v22.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v21-to-v22.patch
+            cat source-v221/chunk*.b64 > buildsrc/v22-to-v221.patch.gz.b64
+            test "$(wc -c < buildsrc/v22-to-v221.patch.gz.b64)" -eq 16156
+            echo '31f3b67fe6ea74795b1dd69fa1b0f4d59e839ab40b1b4b792871de106e11759e  buildsrc/v22-to-v221.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v22-to-v221.patch.gz.b64 | gunzip > buildsrc/v22-to-v221.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v22-to-v221.patch
+            cat source-v23/chunk*.b64 > buildsrc/v221-to-v230.patch.gz.b64
+            test "$(wc -c < buildsrc/v221-to-v230.patch.gz.b64)" -eq 19972
+            echo '1db6146f1de083cdea84c70ceee6542adb5f7073a6d5da27e49d2267a3a3d7a9  buildsrc/v221-to-v230.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v221-to-v230.patch.gz.b64 | gunzip > buildsrc/v221-to-v230.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v221-to-v230.patch
+            cat source-v24/chunk*.b64 > buildsrc/v23-to-v24.patch.gz.b64
+            test "$(wc -c < buildsrc/v23-to-v24.patch.gz.b64)" -eq 32076
+            echo '5e50201b37c69788a45b5a59a72e1c6c86154181980627706ab25fce8c26cb76  buildsrc/v23-to-v24.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v23-to-v24.patch.gz.b64 | gunzip > buildsrc/v23-to-v24.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v23-to-v24.patch
+            cat source-v241/chunk*.b64 > buildsrc/v24-to-v241.patch.gz.b64
+            test "$(wc -c < buildsrc/v24-to-v241.patch.gz.b64)" -eq 5788
+            echo '4c2163311098b6e76a1ddb5b6d21215bc86a6a3d059260a4d594e77f6dafdeff  buildsrc/v24-to-v241.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v24-to-v241.patch.gz.b64 | gunzip > buildsrc/v24-to-v241.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v24-to-v241.patch
+            cp source-v25/v241-to-v25.patch.gz.b64 buildsrc/v241-to-v25.patch.gz.b64
+            test "$(wc -c < buildsrc/v241-to-v25.patch.gz.b64)" -eq 13280
+            echo '0189cc5197ee1ce357c818c1cc3e009148fd62f4caa96fd369615ef87016992a  buildsrc/v241-to-v25.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v241-to-v25.patch.gz.b64 | gunzip > buildsrc/v241-to-v25.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v241-to-v25.patch
+            find buildsrc/quiet-diary -name '*.orig' -delete
+            test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+            grep -q 'versionName = "0.25"' buildsrc/quiet-diary/app/build.gradle.kts
+            grep -q 'verificationCountdown' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            grep -q 'EXTRA_VERIFICATION_STARTED_AT' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+            grep -q 'Вокруг слишком шумно' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
+            test -f buildsrc/quiet-diary/app/src/main/res/drawable/night_command_background.xml
+            python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('buildsrc/quiet-diary/app/src/main/res/layout')
+          android = '{http://schemas.android.com/apk/res/android}'
+          for path in root.glob('*.xml'):
+              tree = ET.parse(path)
+              for node in tree.iter():
+                  if node.tag.endswith('TextInputEditText') and android + 'hint' in node.attrib:
+                      raise RuntimeError(f'Duplicate input hint remains in {path}: {node.attrib[android + "hint"]}')
+          PY
+          } > buildsrc/restore.log 2>&1
+
+      - name: Upload restore log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25-restore-log
+          path: buildsrc/restore.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after restore log upload
+        if: steps.restore.outcome == 'failure'
+        run: exit 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Test and build
+        id: compile
+        continue-on-error: true
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug :app:assembleRelease --stacktrace --console=plain > buildsrc/gradle-build.log 2>&1
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25-compiler-log
+          path: buildsrc/gradle-build.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Prepare artifacts
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.25-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk Nightseed-0.25-release-unsigned.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25-debug-apk
+          path: Nightseed-0.25-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25-release-unsigned-apk
+          path: Nightseed-0.25-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 30
