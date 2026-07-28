@@ -3,6 +3,8 @@ name: Export Nightseed 0.23 Source
 on:
   push:
     branches: [ agent/v0-24-visual-polish ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
