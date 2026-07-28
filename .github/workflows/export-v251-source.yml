@@ -1,0 +1,87 @@
+name: Export Nightseed 0.25 Source for 0.25.1
+
+on:
+  push:
+    branches: [ agent/v0-25-1-regression-fixes ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.25 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc/quiet-diary
+          cat source-v15/part*.b64 > buildsrc/golos-source-0.15.b64
+          base64 --decode buildsrc/golos-source-0.15.b64 > buildsrc/golos-source-0.15.zip
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          archive = Path('buildsrc/golos-source-0.15.zip')
+          target = Path('buildsrc/quiet-diary')
+          with ZipFile(archive) as zf:
+              bad = zf.testzip()
+              if bad is not None:
+                  raise RuntimeError(f'ZIP CRC error: {bad}')
+              zf.extractall(target)
+          PY
+          base64 --decode source-v15-hotfix/v15-hotfix.patch.gz.b64 | gunzip > buildsrc/v15-hotfix.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-hotfix.patch
+          base64 --decode source-v16/v15-to-v16.patch.gz.b64 | gunzip > buildsrc/v15-to-v16.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v15-to-v16.patch
+          cat source-v17-small/chunk*.b64 | base64 --decode | gunzip > buildsrc/v16-to-v17.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v16-to-v17.patch || true
+          unexpected_rejects="$(find buildsrc/quiet-diary -name '*.rej' ! -path '*/README.md.rej' -print)"
+          test -z "$unexpected_rejects"
+          rm -f buildsrc/quiet-diary/README.md.rej
+          base64 --decode source-v17-hotfix/dream-category.patch.gz.b64 | gunzip > buildsrc/v17-dream-category.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v17-dream-category.patch
+          cat source-v18-fix/chunk00a.b64 source-v18-fix/chunk00b.b64 source-v18/chunk01.b64 source-v18/chunk02.b64 source-v18/chunk03.b64 | base64 --decode | gunzip > buildsrc/v17-to-v18.patch
+          patch -p4 -d buildsrc/quiet-diary < buildsrc/v17-to-v18.patch
+          cat source-v19-small/chunk*.b64 | base64 --decode | gunzip > buildsrc/v18-to-v19.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v18-to-v19.patch || true
+          unexpected_rejects="$(find buildsrc/quiet-diary -name '*.rej' ! -path '*/README.md.rej' -print)"
+          test -z "$unexpected_rejects"
+          rm -f buildsrc/quiet-diary/README.md.rej
+          patch -p1 -d buildsrc/quiet-diary < source-v19-hotfix/nav-attributes.patch
+          cat source-v20/chunk*.b64 | base64 --decode | gunzip > buildsrc/v19-to-v20.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v19-to-v20.patch
+          patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/theme-background.patch
+          patch -p1 -d buildsrc/quiet-diary < source-v20-hotfix/time-normalization.patch
+          cat source-v21/chunk*.b64 | base64 --decode | gunzip > buildsrc/v20-to-v21.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v20-to-v21.patch
+          patch -p1 -d buildsrc/quiet-diary < source-v21-hotfix/text-button-style.patch
+          cat source-v22/chunk*.b64 | base64 --decode | gunzip > buildsrc/v21-to-v22.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v21-to-v22.patch
+          cat source-v221/chunk*.b64 | base64 --decode | gunzip > buildsrc/v22-to-v221.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v22-to-v221.patch
+          cat source-v23/chunk*.b64 | base64 --decode | gunzip > buildsrc/v221-to-v23.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v221-to-v23.patch
+          cat source-v24/chunk*.b64 | base64 --decode | gunzip > buildsrc/v23-to-v24.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v23-to-v24.patch
+          cat source-v241/chunk*.b64 | base64 --decode | gunzip > buildsrc/v24-to-v241.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v24-to-v241.patch
+          cp source-v25/v241-to-v25.patch.gz.b64 buildsrc/v241-to-v25.patch.gz.b64
+          test "$(wc -c < buildsrc/v241-to-v25.patch.gz.b64)" -eq 13848
+          echo '28f0ad3d509825e6d053eb99348a197e244edfb8ade026e6662917fa769d122b  buildsrc/v241-to-v25.patch.gz.b64' | sha256sum -c -
+          base64 --decode buildsrc/v241-to-v25.patch.gz.b64 | gunzip > buildsrc/v241-to-v25.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v241-to-v25.patch
+          find buildsrc/quiet-diary -name '*.orig' -delete
+          test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+          grep -q 'versionName = "0.25"' buildsrc/quiet-diary/app/build.gradle.kts
+
+      - name: Upload restored source
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25-restored-source-v251
+          path: buildsrc/quiet-diary
+          if-no-files-found: error
+          retention-days: 7
