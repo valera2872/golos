@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore Nightseed 0.23 project
+      - name: Restore Nightseed 0.24 project
         id: restore
         continue-on-error: true
         shell: bash
@@ -96,25 +96,32 @@ jobs:
             echo '1db6146f1de083cdea84c70ceee6542adb5f7073a6d5da27e49d2267a3a3d7a9  buildsrc/v221-to-v230.patch.gz.b64' | sha256sum -c -
             base64 --decode buildsrc/v221-to-v230.patch.gz.b64 | gunzip > buildsrc/v221-to-v230.patch
             patch -p1 -d buildsrc/quiet-diary < buildsrc/v221-to-v230.patch
+
+            cat source-v24/chunk*.b64 > buildsrc/v23-to-v24.patch.gz.b64
+            test "$(wc -c < buildsrc/v23-to-v24.patch.gz.b64)" -eq 32076
+            echo '5e50201b37c69788a45b5a59a72e1c6c86154181980627706ab25fce8c26cb76  buildsrc/v23-to-v24.patch.gz.b64' | sha256sum -c -
+            base64 --decode buildsrc/v23-to-v24.patch.gz.b64 | gunzip > buildsrc/v23-to-v24.patch
+            patch -p1 -d buildsrc/quiet-diary < buildsrc/v23-to-v24.patch
             find buildsrc/quiet-diary -name '*.orig' -delete
 
             test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
-            grep -q 'versionName = "0.23"' buildsrc/quiet-diary/app/build.gradle.kts
+            grep -q 'versionName = "0.24"' buildsrc/quiet-diary/app/build.gradle.kts
             grep -q 'android:label="Nightseed"' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
-            grep -q 'FAST_END_SILENCE_BLOCKS = 3' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
-            grep -q 'быстрый запуск по обученному голосовому образцу' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
-            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CoueReminderReceiver.java
-            grep -q 'openCouePracticeButton' buildsrc/quiet-diary/app/src/main/res/layout/activity_lucid_practice.xml
-            grep -q 'Включить ночной режим' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightseedPulseView.java
+            test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CoueTheoryActivity.java
+            grep -q 'onboarding_v24_seen' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/OnboardingActivity.java
+            grep -q 'putBoolean("fast_start_enabled", false)' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/MainActivity.java
+            grep -q 'A short haptic cue is immediate' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+            ! grep -q 'TextToSpeech' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
             ! grep -q 'NightClockView' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+            ! grep -R -q 'прораст' buildsrc/quiet-diary/app/src/main
           } > buildsrc/restore.log 2>&1
 
       - name: Upload restore log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nightseed-0.23-restore-log
+          name: nightseed-0.24-restore-log
           path: buildsrc/restore.log
           if-no-files-found: error
           retention-days: 7
@@ -150,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nightseed-0.23-compiler-log
+          name: nightseed-0.24-compiler-log
           path: buildsrc/gradle-build.log
           if-no-files-found: error
           retention-days: 7
@@ -161,21 +168,21 @@ jobs:
 
       - name: Prepare artifacts
         run: |
-          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.23-debug.apk
-          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk Nightseed-0.23-release-unsigned.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.24-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk Nightseed-0.24-release-unsigned.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: nightseed-0.23-debug-apk
-          path: Nightseed-0.23-debug.apk
+          name: nightseed-0.24-debug-apk
+          path: Nightseed-0.24-debug.apk
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload unsigned release APK
         uses: actions/upload-artifact@v4
         with:
-          name: nightseed-0.23-release-unsigned-apk
-          path: Nightseed-0.23-release-unsigned.apk
+          name: nightseed-0.24-release-unsigned-apk
+          path: Nightseed-0.24-release-unsigned.apk
           if-no-files-found: error
           retention-days: 30
