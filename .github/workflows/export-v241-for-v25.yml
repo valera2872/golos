@@ -1,8 +1,8 @@
 name: Export Nightseed 0.24.1 Source for 0.25
 
 on:
-  push:
-    branches: [ agent/v0-25-recognition-responsive-ui ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
