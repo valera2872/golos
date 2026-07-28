@@ -3,6 +3,8 @@ name: Export Nightseed 0.24 Source
 on:
   push:
     branches: [ agent/v0-24-1-coue-practice ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
