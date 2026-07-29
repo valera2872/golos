@@ -1,0 +1,11 @@
+--- a/app/src/main/java/com/quietdiary/app/CoueVoiceProcessor.java
++++ b/app/src/main/java/com/quietdiary/app/CoueVoiceProcessor.java
+@@ -17,7 +17,7 @@ public final class CoueVoiceProcessor {
+         double quietLimit = Math.max(150.0, noiseFloor * 1.45);
+         double openLimit = Math.max(320.0, noiseFloor * 2.10);
+ 
+-        double gain = 1.0;
++        double gain = frameRms.length > 0 && frameRms[0] >= openLimit ? 1.0 : 0.16;
+         double peak = 1.0;
+         double[] cleaned = new double[centered.length];
+         for (int offset = 0, frameIndex = 0; offset < centered.length; offset += FRAME, frameIndex++) {
