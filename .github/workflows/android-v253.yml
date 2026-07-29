@@ -45,7 +45,7 @@ jobs:
             exit 1
           fi
 
-          cat source-v253/chunk*.b64 > buildsrc/v252-to-v253.patch.gz.b64
+          cat source-v253/chunk000.b64 source-v253-small/part*.b64 > buildsrc/v252-to-v253.patch.gz.b64
           test "$(wc -c < buildsrc/v252-to-v253.patch.gz.b64)" -eq 22224
           echo 'e2411a45a73f3714ce864ced9816b519094888947a1498cb959b930ebef22770  buildsrc/v252-to-v253.patch.gz.b64' | sha256sum -c -
           base64 --decode buildsrc/v252-to-v253.patch.gz.b64 | gunzip > buildsrc/v252-to-v253.patch
