@@ -1,8 +1,8 @@
 name: Export Nightseed 0.25.3 Source for 0.25.4
 
 on:
-  push:
-    branches: [ agent/v0-25-4-custom-phrase-noise-cleanup ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
