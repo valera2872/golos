@@ -1,0 +1,42 @@
+name: Export Nightseed 0.25.3 Source for 0.25.4
+
+on:
+  push:
+    branches: [ agent/v0-25-4-custom-phrase-noise-cleanup ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.25.3 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/android-v253.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.25.3 project'
+          start_step = workflow.index(marker)
+          run_line = next(i for i in range(start_step, len(workflow)) if workflow[i].strip() == 'run: |')
+          end_step = next(i for i in range(run_line + 1, len(workflow)) if workflow[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
+          Path('/tmp/restore-nightseed-v253.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/restore-nightseed-v253.sh
+          grep -q 'versionName = "0.25.3"' buildsrc/quiet-diary/app/build.gradle.kts
+
+      - name: Upload restored source
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25.3-restored-source-v254
+          path: buildsrc/quiet-diary
+          if-no-files-found: error
+          retention-days: 7
