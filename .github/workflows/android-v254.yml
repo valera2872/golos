@@ -46,7 +46,7 @@ jobs:
           test "$(wc -c < source-v254/v253-to-v254.patch.gz.b64)" -eq 10704
           echo 'e4be867c808f2a0e8b3880bd9d618c5bf35e70fce988dbb07ce61a7a6e685cc7  source-v254/v253-to-v254.patch.gz.b64' | sha256sum -c -
           base64 --decode source-v254/v253-to-v254.patch.gz.b64 | gunzip > buildsrc/v253-to-v254.patch
-          patch -p2 -d buildsrc/quiet-diary < buildsrc/v253-to-v254.patch
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v253-to-v254.patch
           find buildsrc/quiet-diary -name '*.orig' -delete
           test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
 
