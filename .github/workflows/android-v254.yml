@@ -47,12 +47,14 @@ jobs:
           echo 'e4be867c808f2a0e8b3880bd9d618c5bf35e70fce988dbb07ce61a7a6e685cc7  source-v254/v253-to-v254.patch.gz.b64' | sha256sum -c -
           base64 --decode source-v254/v253-to-v254.patch.gz.b64 | gunzip > buildsrc/v253-to-v254.patch
           patch -p1 -d buildsrc/quiet-diary < buildsrc/v253-to-v254.patch
+          patch -p1 -d buildsrc/quiet-diary < source-v254/coue-noise-gate-fix.patch
           find buildsrc/quiet-diary -name '*.orig' -delete
           test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
 
           grep -q 'versionCode = 254' buildsrc/quiet-diary/app/build.gradle.kts
           grep -q 'versionName = "0.25.4"' buildsrc/quiet-diary/app/build.gradle.kts
           grep -q 'NoiseSuppressor' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+          grep -q 'frameRms.length > 0 && frameRms\[0\] >= openLimit' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CoueVoiceProcessor.java
           grep -q 'Дневник снов' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
           grep -q 'wake_phrase' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'Кодовая фраза должна состоять из 2–4 слов' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
