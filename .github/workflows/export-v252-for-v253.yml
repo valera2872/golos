@@ -1,8 +1,8 @@
 name: Export Nightseed 0.25.2 Source for 0.25.3
 
 on:
-  push:
-    branches: [ agent/v0-25-3-premium-onboarding ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: read
