@@ -25,6 +25,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p buildsrc
+          exec > >(tee buildsrc/restore-v253.log) 2>&1
           python3 - <<'PY'
           from pathlib import Path
           import textwrap
@@ -37,26 +39,30 @@ jobs:
           script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
           Path('/tmp/restore-nightseed-v252.sh').write_text(script, encoding='utf-8')
           PY
-          bash /tmp/restore-nightseed-v252.sh
-          {
-            cat source-v253/chunk*.b64 > buildsrc/v252-to-v253.patch.gz.b64
-            test "$(wc -c < buildsrc/v252-to-v253.patch.gz.b64)" -eq 22224
-            echo 'e2411a45a73f3714ce864ced9816b519094888947a1498cb959b930ebef22770  buildsrc/v252-to-v253.patch.gz.b64' | sha256sum -c -
-            base64 --decode buildsrc/v252-to-v253.patch.gz.b64 | gunzip > buildsrc/v252-to-v253.patch
-            patch -p2 -d buildsrc/quiet-diary < buildsrc/v252-to-v253.patch
-            find buildsrc/quiet-diary -name '*.orig' -delete
-            test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+          if ! bash /tmp/restore-nightseed-v252.sh; then
+            echo 'Nightseed 0.25.2 restoration failed:'
+            cat buildsrc/restore-v252.log 2>/dev/null || true
+            exit 1
+          fi
 
-            grep -q 'versionName = "0.25.3"' buildsrc/quiet-diary/app/build.gradle.kts
-            grep -q 'MIN_REQUIRED_SAMPLES = 3' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
-            grep -q 'MAX_REQUIRED_SAMPLES = 5' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
-            grep -q 'assessTraining' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
-            grep -q 'bedside_test_passed' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
-            grep -q 'Научим Nightseed узнавать именно вас' buildsrc/quiet-diary/app/src/main/res/layout/activity_settings.xml
-            grep -q 'Не дайте ночной мысли исчезнуть' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
-            grep -q 'MAX_WAKE_VERIFICATION_BUFFER_SAMPLES = SAMPLE_RATE \* 12' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          cat source-v253/chunk*.b64 > buildsrc/v252-to-v253.patch.gz.b64
+          test "$(wc -c < buildsrc/v252-to-v253.patch.gz.b64)" -eq 22224
+          echo 'e2411a45a73f3714ce864ced9816b519094888947a1498cb959b930ebef22770  buildsrc/v252-to-v253.patch.gz.b64' | sha256sum -c -
+          base64 --decode buildsrc/v252-to-v253.patch.gz.b64 | gunzip > buildsrc/v252-to-v253.patch
+          patch -p2 -d buildsrc/quiet-diary < buildsrc/v252-to-v253.patch
+          find buildsrc/quiet-diary -name '*.orig' -delete
+          test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
 
-            python3 - <<'PY'
+          grep -q 'versionName = "0.25.3"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'MIN_REQUIRED_SAMPLES = 3' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'MAX_REQUIRED_SAMPLES = 5' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'assessTraining' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'bedside_test_passed' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'Научим Nightseed узнавать именно вас' buildsrc/quiet-diary/app/src/main/res/layout/activity_settings.xml
+          grep -q 'Не дайте ночной мысли исчезнуть' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+          grep -q 'MAX_WAKE_VERIFICATION_BUFFER_SAMPLES = SAMPLE_RATE \* 12' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+
+          python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
           ET.parse('buildsrc/quiet-diary/app/src/main/AndroidManifest.xml')
@@ -65,7 +71,6 @@ jobs:
           for path in Path('buildsrc/quiet-diary/app/src/main/res/drawable').glob('*.xml'):
               ET.parse(path)
           PY
-          } > buildsrc/restore-v253.log 2>&1
 
       - name: Upload restore log
         if: always()
