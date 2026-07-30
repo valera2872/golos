@@ -1,0 +1,53 @@
+name: Export Nightseed 0.25.4 source for 0.25.5
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.25.4 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/android-v254.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.25.4 project'
+          start_step = workflow.index(marker)
+          run_line = next(i for i in range(start_step, len(workflow)) if workflow[i].strip() == 'run: |')
+          end_step = next(i for i in range(run_line + 1, len(workflow)) if workflow[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
+          Path('/tmp/restore-nightseed-v254.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/restore-nightseed-v254.sh
+          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+          test -f buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CoueVoiceProcessor.java
+          grep -q 'versionName = "0.25.4"' buildsrc/quiet-diary/app/build.gradle.kts
+
+      - name: Package restored source
+        run: |
+          cd buildsrc
+          zip -qr ../nightseed-0.25.4-restored-source-v255.zip quiet-diary
+
+      - name: Upload restored source
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.25.4-restored-source-v255
+          path: nightseed-0.25.4-restored-source-v255.zip
+          if-no-files-found: error
+          retention-days: 7
