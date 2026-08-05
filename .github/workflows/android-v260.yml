@@ -1,0 +1,169 @@
+name: Build Nightseed 0.26.0 APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.26.0 project
+        id: restore
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc
+          exec > >(tee buildsrc/restore-v260.log) 2>&1
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/android-v257.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.25.7 project'
+          start_step = workflow.index(marker)
+          run_line = next(i for i in range(start_step, len(workflow)) if workflow[i].strip() == 'run: |')
+          end_step = next(i for i in range(run_line + 1, len(workflow)) if workflow[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
+          Path('/tmp/restore-nightseed-v257.sh').write_text(script, encoding='utf-8')
+          PY
+          if ! bash /tmp/restore-nightseed-v257.sh; then
+            echo 'Nightseed 0.25.7 restoration failed:'
+            cat buildsrc/restore-v257.log 2>/dev/null || true
+            exit 1
+          fi
+
+          echo 'ccf5d427fdb4a3ad7a93aec2c1fda15ce7cf8a348e921cbc18115f8c63f5c9a5  source-v260/chunk000.b64' | sha256sum -c -
+          echo 'e7fff99b113b830c03c5dabcbeeece36921c314d0a1569d402bf8c681a0e6955  source-v260/chunk001.b64' | sha256sum -c -
+          echo 'e09b2c1c9566e7e5847ab42780e740dffa3d1849dfe2373616804e313fd5525c  source-v260/chunk002.b64' | sha256sum -c -
+          echo '716549c844a18242a875735e7c89f2be2e09b39826f5b82fb71de0872f685f79  source-v260/chunk003.b64' | sha256sum -c -
+          echo 'a577fad18efb1f005aea415bfd8fc7e7c0f57cf1f9741877aa9600b855993270  source-v260/chunk004.b64' | sha256sum -c -
+          cat source-v260/chunk000.b64 source-v260/chunk001.b64 source-v260/chunk002.b64 source-v260/chunk003.b64 source-v260/chunk004.b64 > buildsrc/v257-to-v260.patch.gz.b64
+          test "$(wc -c < buildsrc/v257-to-v260.patch.gz.b64)" -eq 16076
+          base64 --decode buildsrc/v257-to-v260.patch.gz.b64 | gunzip > buildsrc/v257-to-v260.patch
+          echo '26b520a31d06a8773233108eaa938e6a5f0526aa4ac2edf80a39e79f7395e71f  buildsrc/v257-to-v260.patch' | sha256sum -c -
+
+          # Night recognition was successful on a physical device and remains frozen in 0.26.
+          ! grep -q 'NightCaptureService.java' buildsrc/v257-to-v260.patch
+          ! grep -q 'GoogleSpeechTranscriber.kt' buildsrc/v257-to-v260.patch
+          ! grep -q 'AcousticWakeDetector.java' buildsrc/v257-to-v260.patch
+          ! grep -q 'LiveCommandRecognizer.kt' buildsrc/v257-to-v260.patch
+          ! grep -q 'WakeTemplateStore.java' buildsrc/v257-to-v260.patch
+          ! grep -q 'CouePracticeService.java' buildsrc/v257-to-v260.patch
+
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v257-to-v260.patch
+          find buildsrc/quiet-diary -name '*.orig' -delete
+          test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+
+          grep -q 'versionCode = 260' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.26.0"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'class NightSessionStore' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightSessionStore.java
+          grep -q 'class NightArchiveActivity' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightArchiveActivity.java
+          grep -q 'class NightDetailActivity' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightDetailActivity.java
+          grep -q 'setAllCaps(false)' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightDetailActivity.java
+          grep -q 'ЭТОЙ НОЧЬЮ' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+          grep -q 'Все ночи' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+          grep -q 'nightSessionId = source.nightSessionId' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveExport.java
+          grep -q 'nights/' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveExport.java
+          grep -q 'NightArchiveActivity' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
+          grep -q 'NightDetailActivity' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          ET.parse('buildsrc/quiet-diary/app/src/main/AndroidManifest.xml')
+          for path in Path('buildsrc/quiet-diary/app/src/main/res/layout').glob('*.xml'):
+              ET.parse(path)
+          for path in Path('buildsrc/quiet-diary/app/src/main/res/drawable').glob('*.xml'):
+              ET.parse(path)
+          PY
+
+      - name: Upload restore log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.26.0-restore-log
+          path: buildsrc/restore-v260.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after restore log upload
+        if: steps.restore.outcome == 'failure'
+        run: exit 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Test and build
+        id: compile
+        continue-on-error: true
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug :app:assembleRelease --stacktrace --console=plain > buildsrc/gradle-build-v260.log 2>&1
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.26.0-compiler-log
+          path: buildsrc/gradle-build-v260.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Prepare artifacts
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.26.0-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk Nightseed-0.26.0-release-unsigned.apk
+          cd buildsrc
+          zip -qr ../nightseed-0.26.0-restored-source.zip quiet-diary
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.26.0-debug-apk
+          path: Nightseed-0.26.0-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.26.0-release-unsigned-apk
+          path: Nightseed-0.26.0-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload reconstructed source
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.26.0-restored-source
+          path: nightseed-0.26.0-restored-source.zip
+          if-no-files-found: error
+          retention-days: 7
