@@ -43,10 +43,10 @@ jobs:
             exit 1
           fi
 
-          test "$(wc -c < source-v260/v257-to-v260.patch.gz.b64)" -eq 16247
-          echo '7117ca0bb4083c0aaf02ecc0c1fd3413200200462079b0e2afd3f6499d579662  source-v260/v257-to-v260.patch.gz.b64' | sha256sum -c -
+          test "$(wc -c < source-v260/v257-to-v260.patch.gz.b64)" -eq 16077
+          echo '3bcf276f67f9e42e43200ad2b82048fe363df7d5574937d52b0543ac00ccaf12  source-v260/v257-to-v260.patch.gz.b64' | sha256sum -c -
           base64 --decode source-v260/v257-to-v260.patch.gz.b64 | gunzip > buildsrc/v257-to-v260.patch
-          echo '75997fab91f2356f3066469289a50ec74d98f4be29d96e4d39686009fc1b399b  buildsrc/v257-to-v260.patch' | sha256sum -c -
+          echo '26b520a31d06a8773233108eaa938e6a5f0526aa4ac2edf80a39e79f7395e71f  buildsrc/v257-to-v260.patch' | sha256sum -c -
 
           # Night recognition was successful on a physical device and remains frozen in 0.26.
           ! grep -q 'NightCaptureService.java' buildsrc/v257-to-v260.patch
@@ -65,6 +65,7 @@ jobs:
           grep -q 'class NightSessionStore' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightSessionStore.java
           grep -q 'class NightArchiveActivity' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightArchiveActivity.java
           grep -q 'class NightDetailActivity' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightDetailActivity.java
+          grep -q 'setAllCaps(false)' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/NightDetailActivity.java
           grep -q 'ЭТОЙ НОЧЬЮ' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
           grep -q 'Все ночи' buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
           grep -q 'nightSessionId = source.nightSessionId' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/ArchiveExport.java
