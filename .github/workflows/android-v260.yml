@@ -43,7 +43,14 @@ jobs:
             exit 1
           fi
 
-          base64 --decode source-v260/v257-to-v260.patch.gz.b64 | gunzip > buildsrc/v257-to-v260.patch
+          echo 'ccf5d427fdb4a3ad7a93aec2c1fda15ce7cf8a348e921cbc18115f8c63f5c9a5  source-v260/chunk000.b64' | sha256sum -c -
+          echo 'e7fff99b113b830c03c5dabcbeeece36921c314d0a1569d402bf8c681a0e6955  source-v260/chunk001.b64' | sha256sum -c -
+          echo 'e09b2c1c9566e7e5847ab42780e740dffa3d1849dfe2373616804e313fd5525c  source-v260/chunk002.b64' | sha256sum -c -
+          echo '716549c844a18242a875735e7c89f2be2e09b39826f5b82fb71de0872f685f79  source-v260/chunk003.b64' | sha256sum -c -
+          echo 'a577fad18efb1f005aea415bfd8fc7e7c0f57cf1f9741877aa9600b855993270  source-v260/chunk004.b64' | sha256sum -c -
+          cat source-v260/chunk000.b64 source-v260/chunk001.b64 source-v260/chunk002.b64 source-v260/chunk003.b64 source-v260/chunk004.b64 > buildsrc/v257-to-v260.patch.gz.b64
+          test "$(wc -c < buildsrc/v257-to-v260.patch.gz.b64)" -eq 16076
+          base64 --decode buildsrc/v257-to-v260.patch.gz.b64 | gunzip > buildsrc/v257-to-v260.patch
           echo '26b520a31d06a8773233108eaa938e6a5f0526aa4ac2edf80a39e79f7395e71f  buildsrc/v257-to-v260.patch' | sha256sum -c -
 
           # Night recognition was successful on a physical device and remains frozen in 0.26.
