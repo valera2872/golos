@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ agent/v0-28-ci-check ]
 
 permissions:
   contents: read
