@@ -1,0 +1,254 @@
+name: Build Nightseed 0.28.1 APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.1 project
+        id: restore
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc
+          exec > >(tee buildsrc/restore-v281.log) 2>&1
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/android-v280.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.28.0 project'
+          start_step = workflow.index(marker)
+          run_line = next(i for i in range(start_step, len(workflow)) if workflow[i].strip() == 'run: |')
+          end_step = next(i for i in range(run_line + 1, len(workflow)) if workflow[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
+          Path('/tmp/restore-nightseed-v280.sh').write_text(script, encoding='utf-8')
+          PYRESTORE
+          if ! bash /tmp/restore-nightseed-v280.sh; then
+            echo 'Nightseed 0.28.0 restoration failed:'
+            cat buildsrc/restore-v280.log 2>/dev/null || true
+            exit 1
+          fi
+
+          cat source-v281/patch_* > buildsrc/v280-to-v281.patch.gz.b64
+          test "$(wc -c < buildsrc/v280-to-v281.patch.gz.b64)" -eq 22436
+          echo 'f67cee1d1f7d67154bda7c2d9f1028096bd30eb45a922576760d08a6c4043a00  source-v281/patch_000' | sha256sum -c -
+          echo '7aee89a3d3de02ccb2299f529f92ce3b3f384479321760166903583aac4a18e6  source-v281/patch_001' | sha256sum -c -
+          echo 'd38bd68edd2408cd4ad5b01b8dc4192711da9cf456bbb91146e0d4b43b5ec027  source-v281/patch_002' | sha256sum -c -
+          echo 'd293163acce891ce23e6f380876e425ad57def26f8e5d793240fe8e6f05e01ab  source-v281/patch_003' | sha256sum -c -
+          echo '8cc8970e311ef087ad25c78c5b0be49f766306cf8beeb08da7382a58704a4bd7  source-v281/patch_004' | sha256sum -c -
+          echo 'cb8dc169421101f19fcec95fb1f1e2f41e07e6607aa5ec38ef667015c60042af  source-v281/patch_005' | sha256sum -c -
+          base64 --decode buildsrc/v280-to-v281.patch.gz.b64 | gunzip > buildsrc/v280-to-v281.patch
+          echo 'c269876339bc8d2b22563d53e7f1c025853e855748727d68a34de587b91da81b  buildsrc/v280-to-v281.patch' | sha256sum -c -
+
+          # Language, practices and media are revised; proven night recognition remains frozen.
+          ! grep -q 'NightCaptureService.java' buildsrc/v280-to-v281.patch
+          ! grep -q 'GoogleSpeechTranscriber.kt' buildsrc/v280-to-v281.patch
+          ! grep -q 'AcousticWakeDetector.java' buildsrc/v280-to-v281.patch
+          ! grep -q 'LiveCommandRecognizer.kt' buildsrc/v280-to-v281.patch
+          ! grep -q 'WakeTemplateStore.java' buildsrc/v280-to-v281.patch
+
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v280-to-v281.patch
+          mkdir -p buildsrc/quiet-diary/app/src/main/res/raw buildsrc/sound-wav
+          python3 -m pip install --quiet numpy scipy
+          python3 - <<'PYSOUND'
+          import numpy as np
+          from scipy.signal import butter, sosfilt
+          from scipy.io import wavfile
+          from pathlib import Path
+
+          sr = 22050
+          duration = 32.0
+          n = int(sr * duration)
+          t = np.arange(n) / sr
+          rng = np.random.default_rng(281)
+          out = Path('buildsrc/sound-wav')
+
+          def normalize(values, peak=0.84):
+              values = np.asarray(values, dtype=np.float64)
+              values -= np.mean(values)
+              maximum = np.max(np.abs(values)) + 1e-12
+              return (values / maximum * peak).astype(np.float32)
+
+          def crossfade(values, seconds=2.0):
+              length = int(sr * seconds)
+              weight = np.linspace(0.0, 1.0, length)
+              blend = values[-length:] * (1.0 - weight) + values[:length] * weight
+              result = values.copy()
+              result[:length] = blend
+              result[-length:] = blend
+              return result
+
+          def write(name, values):
+              values = crossfade(normalize(values))
+              wavfile.write(out / f'{name}.wav', sr, (values * 32767).astype(np.int16))
+
+          white = rng.normal(0, 1, n)
+          rain = sosfilt(butter(4, [500/(sr/2), 7000/(sr/2)], btype='bandpass', output='sos'), white) * 0.35
+          for _ in range(int(duration * 7)):
+              start = rng.integers(0, n - int(sr * 0.12))
+              length = int(sr * rng.uniform(0.025, 0.10))
+              local_t = np.arange(length) / sr
+              frequency = rng.uniform(1300, 5000)
+              rain[start:start+length] += np.sin(2*np.pi*frequency*local_t) * np.exp(-local_t*rng.uniform(28,60)) * rng.uniform(0.08,0.24)
+          write('rain_soft', rain)
+
+          white = rng.normal(0, 1, n)
+          surf = sosfilt(butter(4, 1400/(sr/2), btype='lowpass', output='sos'), white)
+          envelope = 0.16 + 0.42*(0.5+0.5*np.sin(2*np.pi*t/7.4+0.4))**2 + 0.24*(0.5+0.5*np.sin(2*np.pi*t/12.7+2.1))**3
+          airy = sosfilt(butter(3, [900/(sr/2),6500/(sr/2)], btype='bandpass', output='sos'), rng.normal(0,1,n))
+          ocean = surf*envelope + airy*np.maximum(0,np.sin(2*np.pi*t/7.4+0.8))**8*0.18
+          write('ocean_swell', ocean)
+
+          white = rng.normal(0, 1, n)
+          stream = sosfilt(butter(4, [650/(sr/2),7600/(sr/2)], btype='bandpass', output='sos'), white) * 0.32
+          stream *= 0.78 + 0.12*np.sin(2*np.pi*t/4.8) + 0.08*np.sin(2*np.pi*t/2.1)
+          for _ in range(int(duration*2.2)):
+              start = rng.integers(0, n-int(sr*0.25))
+              length = int(sr*rng.uniform(0.08,0.22))
+              local_t = np.arange(length)/sr
+              f0 = rng.uniform(180,520); f1 = f0*rng.uniform(1.4,2.1)
+              phase = 2*np.pi*(f0*local_t+(f1-f0)/(2*(local_t[-1]+1e-6))*local_t**2)
+              stream[start:start+length] += np.sin(phase)*np.exp(-local_t*rng.uniform(8,16))*rng.uniform(0.03,0.10)
+          write('stream_flow', stream)
+
+          forest = sosfilt(butter(4, 1800/(sr/2), btype='lowpass', output='sos'), rng.normal(0,1,n))*0.07
+          forest += 0.018*np.sin(2*np.pi*(4200+80*np.sin(2*np.pi*t/5.5))*t)*(0.45+0.55*np.sin(2*np.pi*t/8.3)**2)
+          for seconds in [2.5,6.8,11.2,16.5,21.1,27.8]:
+              start0 = int(seconds*sr)
+              for repeat in range(2 if seconds % 2 < 1 else 3):
+                  start = start0 + int(repeat*0.28*sr)
+                  length = int(sr*0.18)
+                  local_t = np.arange(length)/sr
+                  f0 = rng.uniform(1800,2600); f1 = f0+rng.uniform(600,1300)
+                  phase = 2*np.pi*(f0*local_t+(f1-f0)/(2*(local_t[-1]+1e-6))*local_t**2)
+                  forest[start:start+length] += np.sin(phase)*np.sin(np.pi*np.clip(local_t/local_t[-1],0,1))**2*rng.uniform(0.05,0.11)
+          write('forest_evening', forest)
+          PYSOUND
+          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          for source in buildsrc/sound-wav/*.wav; do
+            name="$(basename "$source" .wav)"
+            ffmpeg -loglevel error -y -i "$source" -c:a libvorbis -q:a 2 "buildsrc/quiet-diary/app/src/main/res/raw/${name}.ogg"
+          done
+          test "$(stat -c%s buildsrc/quiet-diary/app/src/main/res/raw/rain_soft.ogg)" -gt 30000
+          test "$(stat -c%s buildsrc/quiet-diary/app/src/main/res/raw/ocean_swell.ogg)" -gt 30000
+          test "$(stat -c%s buildsrc/quiet-diary/app/src/main/res/raw/forest_evening.ogg)" -gt 30000
+          test "$(stat -c%s buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg)" -gt 30000
+          find buildsrc/quiet-diary -name '*.orig' -delete
+          test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+
+          grep -q 'versionCode = 281' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.28.1"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'class SoundLibraryActivity' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'class SoundscapeService' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundscapeService.java
+          grep -q 'Ночное самовнушение' buildsrc/quiet-diary/app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'ПОЧЕМУ ПРЕДЛОЖЕНО' buildsrc/quiet-diary/app/src/main/res/layout/activity_sleep_assistant.xml
+          grep -q 'Навык управления состоянием' buildsrc/quiet-diary/app/src/main/res/layout/activity_autogenic_training.xml
+          grep -q 'Открыть звуки природы' buildsrc/quiet-diary/app/src/main/res/layout/activity_night_program.xml
+          ! grep -q 'Формула Куэ' buildsrc/quiet-diary/app/src/main/res/layout/activity_night_program.xml
+          grep -q 'SoundscapeService' buildsrc/quiet-diary/app/src/main/AndroidManifest.xml
+
+          python3 - <<'PYXML'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          ET.parse('buildsrc/quiet-diary/app/src/main/AndroidManifest.xml')
+          for path in Path('buildsrc/quiet-diary/app/src/main/res/layout').glob('*.xml'):
+              ET.parse(path)
+          for path in Path('buildsrc/quiet-diary/app/src/main/res/drawable').glob('*.xml'):
+              ET.parse(path)
+          PYXML
+
+      - name: Upload restore log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.1-restore-log
+          path: buildsrc/restore-v281.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after restore log upload
+        if: steps.restore.outcome == 'failure'
+        run: exit 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Test and build
+        id: compile
+        continue-on-error: true
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug :app:assembleRelease --stacktrace --console=plain > buildsrc/gradle-build-v281.log 2>&1
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.1-compiler-log
+          path: buildsrc/gradle-build-v281.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Prepare artifacts
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.1-debug.apk
+          cp buildsrc/quiet-diary/app/build/outputs/apk/release/app-release-unsigned.apk Nightseed-0.28.1-release-unsigned.apk
+          cd buildsrc
+          zip -qr ../nightseed-0.28.1-restored-source.zip quiet-diary
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.1-debug-apk
+          path: Nightseed-0.28.1-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.1-release-unsigned-apk
+          path: Nightseed-0.28.1-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload reconstructed source
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.1-restored-source
+          path: nightseed-0.28.1-restored-source.zip
+          if-no-files-found: error
+          retention-days: 7
