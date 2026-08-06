@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [ main ]
   push:
-    branches: [ agent/v0-28-ci-check ]
+    branches: [ main, agent/v0-28-ci-check ]
 
 permissions:
   contents: write
@@ -155,7 +155,7 @@ jobs:
           git add source-v280/ci-result
           if ! git diff --cached --quiet; then
             git commit -m "Record Nightseed 0.28 CI result ${GITHUB_RUN_ID}"
-            git push origin HEAD:agent/v0-28-ci-check
+            git push origin HEAD:${GITHUB_REF_NAME}
           fi
 
       - name: Fail after compiler log upload
