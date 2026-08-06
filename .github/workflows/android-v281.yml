@@ -64,6 +64,16 @@ jobs:
           ! grep -q 'WakeTemplateStore.java' buildsrc/v280-to-v281.patch
 
           patch -p1 -d buildsrc/quiet-diary < buildsrc/v280-to-v281.patch
+
+          # Restore new source files that are not part of a regular git diff.
+          cat source-v281/missing_* > buildsrc/v281-missing.tar.gz.b64
+          test "$(wc -c < buildsrc/v281-missing.tar.gz.b64)" -eq 8788
+          echo '77e1141ffcd23103c0a6982de3c049a6254f2659b7cde1ab23e881c550dbdd68  source-v281/missing_000' | sha256sum -c -
+          echo '53908c8ad1cfc588fc01f76d5ec3b562e9d3c375805b841a06cb584864664103  source-v281/missing_001' | sha256sum -c -
+          echo 'b6e0ca2940dbddf76adeca9bcd19b1be5d1cd0e52badce68eca30a6cc7bcd1be  source-v281/missing_002' | sha256sum -c -
+          base64 --decode buildsrc/v281-missing.tar.gz.b64 > buildsrc/v281-missing.tar.gz
+          echo '28fd65e4cc6b33549bc85acd8d810aefa8fd38c25f0e784783002b17a8873a54  buildsrc/v281-missing.tar.gz' | sha256sum -c -
+          tar -xzf buildsrc/v281-missing.tar.gz -C buildsrc/quiet-diary
           mkdir -p buildsrc/quiet-diary/app/src/main/res/raw buildsrc/sound-wav
           python3 -m pip install --quiet numpy scipy
           python3 - <<'PYSOUND'
