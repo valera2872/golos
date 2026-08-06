@@ -1,0 +1,1 @@
+Frozen recognition files are excluded from this release patch. CI validates patch integrity, XML, unit tests, debug APK and release APK.
