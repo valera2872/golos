@@ -56,6 +56,7 @@ jobs:
           ! grep -q 'CouePracticeService.java' buildsrc/v261-to-v270.patch
 
           patch -p1 -d buildsrc/quiet-diary < buildsrc/v261-to-v270.patch
+          cp source-v270/night_summary_background.xml buildsrc/quiet-diary/app/src/main/res/drawable/night_summary_background.xml
           find buildsrc/quiet-diary -name '*.orig' -delete
           test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
 
