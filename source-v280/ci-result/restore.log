@@ -1,0 +1,122 @@
+buildsrc/v252-to-v253.patch.gz.b64: OK
+patching file app/build.gradle.kts
+patching file app/src/main/java/com/quietdiary/app/DiagnosticsActivity.java
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightCaptureService.java
+patching file app/src/main/java/com/quietdiary/app/OnboardingActivity.java
+patching file app/src/main/java/com/quietdiary/app/SettingsActivity.java
+patching file app/src/main/java/com/quietdiary/app/WakePhraseTester.java
+patching file app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+patching file app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
+patching file app/src/main/res/drawable/premium_header_background.xml
+patching file app/src/main/res/drawable/premium_orb_frame.xml
+patching file app/src/main/res/drawable/premium_status_background.xml
+patching file app/src/main/res/drawable/premium_training_background.xml
+patching file app/src/main/res/layout/activity_main.xml
+patching file app/src/main/res/layout/activity_onboarding.xml
+patching file app/src/main/res/layout/activity_settings.xml
+patching file app/src/test/java/com/quietdiary/app/WakeTemplateStoreTest.java
+source-v254/v253-to-v254.patch.gz.b64: OK
+patching file app/build.gradle.kts
+patching file app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+patching file app/src/main/java/com/quietdiary/app/CoueVoiceProcessor.java
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightCaptureService.java
+patching file app/src/main/java/com/quietdiary/app/OnboardingActivity.java
+patching file app/src/main/java/com/quietdiary/app/SettingsActivity.java
+patching file app/src/main/res/layout/activity_main.xml
+patching file app/src/main/res/layout/activity_onboarding.xml
+patching file app/src/main/res/layout/activity_settings.xml
+patching file app/src/test/java/com/quietdiary/app/CoueVoiceProcessorTest.java
+patching file app/src/main/java/com/quietdiary/app/CoueVoiceProcessor.java
+buildsrc/v254-to-v255.patch.gz.b64: OK
+patching file app/build.gradle.kts
+patching file app/src/main/AndroidManifest.xml
+patching file app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+patching file app/src/main/java/com/quietdiary/app/CouePracticeService.java
+patching file app/src/main/java/com/quietdiary/app/CoueStartTemplateStore.java
+patching file app/src/main/java/com/quietdiary/app/CoueStartTrainer.java
+patching file app/src/main/res/layout/activity_coue_practice.xml
+source-v256/v255-to-v256.patch.gz.b64: OK
+buildsrc/v255-to-v256.patch: OK
+patching file app/build.gradle.kts
+patching file app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+patching file app/src/main/java/com/quietdiary/app/CouePracticeService.java
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/java/com/quietdiary/app/OnboardingActivity.java
+patching file app/src/main/java/com/quietdiary/app/SettingsActivity.java
+patching file app/src/main/res/layout/activity_settings.xml
+source-v257/v256-to-v257.patch.gz.b64: OK
+buildsrc/v256-to-v257.patch: OK
+patching file app/build.gradle.kts
+patching file app/src/main/java/com/quietdiary/app/OnboardingActivity.java
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/res/layout/activity_main.xml
+patching file app/src/main/res/layout/activity_settings.xml
+patching file app/src/main/res/layout/activity_onboarding.xml
+source-v260/chunk000.b64: OK
+source-v260/chunk001.b64: OK
+source-v260/chunk002.b64: OK
+source-v260/chunk003.b64: OK
+source-v260/chunk004.b64: OK
+buildsrc/v257-to-v260.patch: OK
+patching file app/build.gradle.kts
+patching file app/src/main/AndroidManifest.xml
+patching file app/src/main/java/com/quietdiary/app/ArchiveExport.java
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightArchiveActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightDetailActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightSession.java
+patching file app/src/main/java/com/quietdiary/app/NightSessionStore.java
+patching file app/src/main/res/layout/activity_main.xml
+patching file app/src/main/res/layout/activity_night_archive.xml
+patching file app/src/main/res/layout/activity_night_detail.xml
+patching file app/src/test/java/com/quietdiary/app/NightSessionTest.java
+buildsrc/v260-to-v261.patch: OK
+patching file app/build.gradle.kts
+patching file app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightCaptureService.java
+patching file app/src/main/res/layout/activity_lucid_practice.xml
+buildsrc/v261-to-v270.patch: OK
+patching file app/build.gradle.kts
+patching file app/src/main/AndroidManifest.xml
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightDetailActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightProgramActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightProgramService.java
+patching file app/src/main/java/com/quietdiary/app/NightProgramTools.java
+patching file app/src/main/java/com/quietdiary/app/NightSessionStore.java
+patching file app/src/main/res/layout/activity_main.xml
+patching file app/src/main/res/layout/activity_night_detail.xml
+patching file app/src/main/res/layout/activity_night_program.xml
+patching file app/src/test/java/com/quietdiary/app/NightProgramToolsTest.java
+source-v280/chunk000.b64: OK
+source-v280/chunk001.b64: OK
+source-v280/chunk002.b64: OK
+buildsrc/v270-to-v280.patch: OK
+patching file app/build.gradle.kts
+patching file app/src/main/AndroidManifest.xml
+patching file app/src/main/java/com/quietdiary/app/AutogenicTrainingActivity.java
+patching file app/src/main/java/com/quietdiary/app/CoueTheoryActivity.java
+patching file app/src/main/java/com/quietdiary/app/MainActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightProgramActivity.java
+patching file app/src/main/java/com/quietdiary/app/NightSessionStore.java
+patching file app/src/main/java/com/quietdiary/app/PracticeHubActivity.java
+patching file app/src/main/java/com/quietdiary/app/SleepAssistantActivity.java
+patching file app/src/main/java/com/quietdiary/app/SleepAssistantTools.java
+patching file app/src/main/java/com/quietdiary/app/UiNavigation.java
+patching file app/src/main/java/com/quietdiary/app/WakeAlarmActivity.java
+patching file app/src/main/java/com/quietdiary/app/WakeAlarmReceiver.java
+patching file app/src/main/java/com/quietdiary/app/WakeAlarmScheduler.java
+patching file app/src/main/java/com/quietdiary/app/WakeRescheduleReceiver.java
+patching file app/src/main/java/com/quietdiary/app/WakeSettingsActivity.java
+patching file app/src/main/res/drawable/ic_time.xml
+patching file app/src/main/res/layout/activity_autogenic_training.xml
+patching file app/src/main/res/layout/activity_coue_theory.xml
+patching file app/src/main/res/layout/activity_main.xml
+patching file app/src/main/res/layout/activity_practice_hub.xml
+patching file app/src/main/res/layout/activity_sleep_assistant.xml
+patching file app/src/main/res/layout/activity_wake_alarm.xml
+patching file app/src/main/res/layout/activity_wake_settings.xml
+patching file app/src/test/java/com/quietdiary/app/SleepAssistantToolsTest.java
+patching file app/src/test/java/com/quietdiary/app/WakeAlarmSchedulerTest.java
