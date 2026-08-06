@@ -1,0 +1,1 @@
+The workflow generates four deterministic offline OGG soundscapes during CI, then runs unit tests and builds debug and release APKs.
