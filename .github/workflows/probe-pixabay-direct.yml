@@ -1,0 +1,30 @@
+name: Probe Pixabay direct audio
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe direct download endpoints
+        shell: bash
+        run: |
+          set -euxo pipefail
+          for u in \
+            'https://pixabay.com/music/download/beside-the-sea-harp-and-ocean-525286.mp3' \
+            'https://pixabay.com/music/download/calm-energy-meditation-888hz-peaceful-231909.mp3' \
+            'https://pixabay.com/music/download/music-for-relax-yoga-meditation-7783.mp3'
+          do
+            echo "=== $u ==="
+            curl -L --fail --retry 2 -A 'Mozilla/5.0' -D /tmp/headers.txt -o /tmp/audio.mp3 "$u" || true
+            cat /tmp/headers.txt || true
+            file /tmp/audio.mp3 || true
+            stat -c '%s bytes' /tmp/audio.mp3 || true
+            sha256sum /tmp/audio.mp3 || true
+          done
