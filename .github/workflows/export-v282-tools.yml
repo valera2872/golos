@@ -1,0 +1,30 @@
+name: Export Android packaging tools for 0.28.2
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v3
+      - name: Install build tools
+        run: sdkmanager "build-tools;35.0.0"
+      - name: Collect tools
+        run: |
+          mkdir -p v282-tools/lib64
+          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" v282-tools/zipalign
+          cp "$ANDROID_HOME/build-tools/35.0.0/apksigner" v282-tools/apksigner
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" v282-tools/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib64/libc++.so" v282-tools/lib64/libc++.so
+          chmod +x v282-tools/zipalign v282-tools/apksigner
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-v282-android-tools
+          path: v282-tools
+          retention-days: 7
