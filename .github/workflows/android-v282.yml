@@ -1,0 +1,162 @@
+name: Build Nightseed 0.28.2 APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.2 project
+        id: restore
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc
+          exec > >(tee buildsrc/restore-v282.log) 2>&1
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/android-v281.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.28.1 project'
+          start_step = workflow.index(marker)
+          run_line = next(i for i in range(start_step, len(workflow)) if workflow[i].strip() == 'run: |')
+          end_step = next(i for i in range(run_line + 1, len(workflow)) if workflow[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
+          Path('/tmp/restore-nightseed-v281.sh').write_text(script, encoding='utf-8')
+          PYRESTORE
+          bash /tmp/restore-nightseed-v281.sh
+
+          cat source-v282/patch_* > buildsrc/v281-to-v282.patch.gz.b64
+          test "$(wc -c < buildsrc/v281-to-v282.patch.gz.b64)" -eq 4460
+          echo '64bef35708b6a1b3a5ac41e8470cdb52a6b8d6d5f12bb53e420cb28d646e8570  source-v282/patch_000' | sha256sum -c -
+          echo '1332ae7b052cd6405f80650ce4ac92cf178a4285ea0ea170b4438ec2e42ca363  source-v282/patch_001' | sha256sum -c -
+          base64 --decode buildsrc/v281-to-v282.patch.gz.b64 | gunzip > buildsrc/v281-to-v282.patch
+          echo '4daafd0e04d8350856c5b317dbe541638ec524b8c3e575568bfab72c82d6366b  buildsrc/v281-to-v282.patch' | sha256sum -c -
+
+          ! grep -q 'NightCaptureService.java' buildsrc/v281-to-v282.patch
+          ! grep -q 'GoogleSpeechTranscriber.kt' buildsrc/v281-to-v282.patch
+          ! grep -q 'AcousticWakeDetector.java' buildsrc/v281-to-v282.patch
+          ! grep -q 'LiveCommandRecognizer.kt' buildsrc/v281-to-v282.patch
+          ! grep -q 'WakeTemplateStore.java' buildsrc/v281-to-v282.patch
+
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v281-to-v282.patch
+          rm -f buildsrc/quiet-diary/app/src/main/res/raw/rain_soft.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/ocean_swell.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/forest_evening.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg
+
+          python3 - <<'PYAUDIO'
+          import hashlib, html, re, sys, urllib.request
+          from pathlib import Path
+
+          tracks = [
+              ('https://pixabay.com/music/modern-classical-beside-the-sea-harp-and-ocean-525286/', 'music_sea_harp.mp3', '98fa11c74b316deb9bd72905ccb0da1efb2feb7774d5bc79f8f2c2b47d78b4f0'),
+              ('https://pixabay.com/music/meditationspiritual-calm-energy-meditation-888hz-peaceful-231909/', 'music_calm_energy.mp3', '134d81971b01b4bb43ba0680b74cdfef58312dd4c211e510e9899a614217f6b2'),
+              ('https://pixabay.com/music/meditationspiritual-music-for-relax-yoga-meditation-7783/', 'music_quiet_meditation.mp3', '76527a75f5dcb011418e543c27c86143532208e9695aa74344d1050fabb5ad27'),
+          ]
+          headers = {'User-Agent':'Mozilla/5.0'}
+          out = Path('buildsrc/quiet-diary/app/src/main/res/raw')
+          out.mkdir(parents=True, exist_ok=True)
+          for page, filename, expected in tracks:
+              req = urllib.request.Request(page, headers=headers)
+              source = urllib.request.urlopen(req, timeout=30).read().decode('utf-8', 'ignore')
+              source = html.unescape(source).replace('\\/','/')
+              candidates = re.findall(r'https://cdn\\.pixabay\\.com/(?:download/)?audio/[^"\'<> ]+?\\.mp3(?:\\?[^"\'<> ]*)?', source)
+              seen=[]
+              for url in candidates:
+                  if url in seen: continue
+                  seen.append(url)
+                  try:
+                      data = urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60).read()
+                  except Exception:
+                      continue
+                  digest = hashlib.sha256(data).hexdigest()
+                  if digest == expected:
+                      (out / filename).write_bytes(data)
+                      print(filename, len(data), digest)
+                      break
+              else:
+                  print('Could not locate exact Pixabay source for', filename, 'candidates', len(seen), file=sys.stderr)
+                  sys.exit(2)
+          PYAUDIO
+
+          echo '98fa11c74b316deb9bd72905ccb0da1efb2feb7774d5bc79f8f2c2b47d78b4f0  buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3' | sha256sum -c -
+          echo '134d81971b01b4bb43ba0680b74cdfef58312dd4c211e510e9899a614217f6b2  buildsrc/quiet-diary/app/src/main/res/raw/music_calm_energy.mp3' | sha256sum -c -
+          echo '76527a75f5dcb011418e543c27c86143532208e9695aa74344d1050fabb5ad27  buildsrc/quiet-diary/app/src/main/res/raw/music_quiet_meditation.mp3' | sha256sum -c -
+          grep -q 'versionCode = 282' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.28.2"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'Море и арфа' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          ! grep -q 'Мягкий дождь' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+
+      - name: Upload restore log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.2-restore-log
+          path: buildsrc/restore-v282.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after restore log upload
+        if: steps.restore.outcome == 'failure'
+        run: exit 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Test and build
+        id: compile
+        continue-on-error: true
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain > buildsrc/gradle-build-v282.log 2>&1
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.2-compiler-log
+          path: buildsrc/gradle-build-v282.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Prepare artifact
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.2-debug.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.2-debug-apk
+          path: Nightseed-0.28.2-debug.apk
+          if-no-files-found: error
+          retention-days: 30
