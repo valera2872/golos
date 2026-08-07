@@ -28,7 +28,6 @@ jobs:
           mkdir -p buildsrc
           exec > >(tee buildsrc/restore-v282.log) 2>&1
 
-          # Reuse the already-proven 0.28.1 reconstruction verbatim.
           python3 - <<'PYRESTORE'
           from pathlib import Path
           import textwrap
@@ -41,19 +40,17 @@ jobs:
           Path('/tmp/restore-nightseed-v281.sh').write_text(script, encoding='utf-8')
           PYRESTORE
           if ! bash /tmp/restore-nightseed-v281.sh; then
-            echo 'Nightseed 0.28.1 restoration failed:'
-            cat buildsrc/restore-v281.log 2>/dev/null || true
+            echo 'Nightseed 0.28.1 restoration failed'
             exit 1
           fi
 
           cat source-v282/patch_* > buildsrc/v281-to-v282.patch.gz.b64
-          test "$(wc -c < buildsrc/v281-to-v282.patch.gz.b64)" -eq 4936
-          echo 'ff2e1a97acb9360c47a25d64753bf562a1ea07b5758ddad3a87da0f0d63b00af  source-v282/patch_000' | sha256sum -c -
-          echo '8367f527c226ce7b73723f42b113fb9c8a8f535b16776617b705e6a5808160b8  source-v282/patch_001' | sha256sum -c -
+          test "$(wc -c < buildsrc/v281-to-v282.patch.gz.b64)" -eq 5076
+          echo 'a73516ba9bcd8263f7f8d09085feae335bcec99f17620cb819a7d80c94efed1d  source-v282/patch_000' | sha256sum -c -
+          echo '7ac6603532472b3fb4839e1e04ef81335cb09bc4acd063a563d328ade1ab4738  source-v282/patch_001' | sha256sum -c -
           base64 --decode buildsrc/v281-to-v282.patch.gz.b64 | gunzip > buildsrc/v281-to-v282.patch
-          echo 'a2f1e726d82cfef20a4190f135b14a21cf3e45828e4d61fdfa36453e0043f52c  buildsrc/v281-to-v282.patch' | sha256sum -c -
+          echo 'd66f8672255d74439d04f7091fe31dbe1beadf909a54d9ad57f25eb474cf34f2  buildsrc/v281-to-v282.patch' | sha256sum -c -
 
-          # Proven night recognition is frozen. Any accidental edit fails before compilation.
           ! grep -q 'NightCaptureService.java' buildsrc/v281-to-v282.patch
           ! grep -q 'GoogleSpeechTranscriber.kt' buildsrc/v281-to-v282.patch
           ! grep -q 'AcousticWakeDetector.java' buildsrc/v281-to-v282.patch
@@ -64,128 +61,76 @@ jobs:
           find buildsrc/quiet-diary -name '*.orig' -delete
           test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
 
-          # 0.28.1's synthetic nature sounds were rejected in listening tests.
-          # Remove them completely from this build before adding the three real tracks.
-          rm -f buildsrc/quiet-diary/app/src/main/res/raw/rain_soft.ogg
-          rm -f buildsrc/quiet-diary/app/src/main/res/raw/ocean_swell.ogg
-          rm -f buildsrc/quiet-diary/app/src/main/res/raw/forest_evening.ogg
-          rm -f buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg
+          rm -f buildsrc/quiet-diary/app/src/main/res/raw/rain_soft.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/ocean_swell.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/forest_evening.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg
 
-          # Keep the source MP3 stream: no transcoding, resampling or bitrate reduction.
-          python3 -m pip install --quiet requests "yt-dlp[default,curl-cffi]"
-          python3 - <<'PYMUSIC'
+          # Three starter tracks. We keep the source MP3 stream: no transcoding,
+          # no resampling and no bitrate reduction.
+          python3 -m pip install --quiet yt-dlp
+          RAW='buildsrc/quiet-diary/app/src/main/res/raw'
+          mkdir -p "$RAW"
+
+          yt-dlp --no-playlist --no-progress -f ba \
+            -o "$RAW/calm_energy.mp3" \
+            'https://audio.com/xuan-lethithanhsnvbt/audio/calm-energy-meditation-888hz-peaceful-231909'
+
+          yt-dlp --no-playlist --no-progress -f ba \
+            -o "$RAW/quiet_meditation.mp3" \
+            'https://audio.com/chandani/audio/music-for-relax-yoga-meditation-7783'
+
+          curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 \
+            -o "$RAW/gentle_nature.mp3" \
+            'https://rituels-quatre-saisons.fr/wp-content/uploads/2024/06/meditation-and-gentle-nature-184572.mp3'
+
+          python3 - <<'PYCHECK'
           from pathlib import Path
-          import html, re, subprocess, sys
-          import requests
-
-          out_dir = Path('buildsrc/quiet-diary/app/src/main/res/raw')
-          out_dir.mkdir(parents=True, exist_ok=True)
-          session = requests.Session()
-          session.headers.update({
-              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36',
-              'Accept-Language': 'en-US,en;q=0.9',
-          })
-
-          tracks = [
-              ('sea_harp', 'https://pixabay.com/music/modern-classical-beside-the-sea-harp-and-ocean-525286/', 183, 4_500_000),
-              ('calm_energy', 'https://pixabay.com/music/meditationspiritual-calm-energy-meditation-888hz-peaceful-231909/', 240, 6_000_000),
-              ('quiet_meditation', 'https://pixabay.com/music/meditationspiritual-music-for-relax-yoga-meditation-7783/', 385, 10_000_000),
-          ]
-
-          def candidates_from_page(page_url):
-              r = session.get(page_url, timeout=35)
-              r.raise_for_status()
-              text = html.unescape(r.text).replace('\\/', '/').replace('\\u0026', '&')
-              patterns = [
-                  r'https://cdn\.pixabay\.com/(?:download/)?audio/[^"\'<>\\s]+?\.mp3(?:\?[^"\'<>\\s]*)?',
-                  r'https://cdn\.pixabay\.com/[^"\'<>\\s]+?\.mp3(?:\?[^"\'<>\\s]*)?',
-              ]
-              found = []
-              for pattern in patterns:
-                  found.extend(re.findall(pattern, text))
-              unique = list(dict.fromkeys(found))
-              unique.sort(key=lambda u: ('/download/audio/' not in u, len(u)))
-              return unique
-
-          def fetch_candidate(url, dest, min_size):
-              try:
-                  with session.get(url, stream=True, timeout=45, allow_redirects=True) as r:
-                      r.raise_for_status()
-                      content_type = r.headers.get('content-type', '')
-                      with dest.open('wb') as f:
-                          for chunk in r.iter_content(1024 * 1024):
-                              if chunk:
-                                  f.write(chunk)
-                  if dest.stat().st_size >= min_size:
-                      print('downloaded', dest.name, dest.stat().st_size, content_type, 'from', url.split('?')[0])
-                      return True
-              except Exception as e:
-                  print('candidate failed:', type(e).__name__, str(e)[:180])
-              dest.unlink(missing_ok=True)
-              return False
-
-          def ytdlp_fallback(page_url, dest):
-              dest.unlink(missing_ok=True)
-              cmd = [sys.executable, '-m', 'yt_dlp', '--no-playlist', '--no-progress',
-                     '--impersonate', 'chrome', '--extractor-args', 'generic:impersonate',
-                     '--user-agent', session.headers['User-Agent'], '-f', 'ba', '-o', str(dest), page_url]
-              print('trying yt-dlp fallback for', page_url)
-              result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-              print(result.stdout[-4000:])
-              return result.returncode == 0 and dest.exists()
-
-          for name, page_url, expected_seconds, min_size in tracks:
-              dest = out_dir / f'{name}.mp3'
-              ok = False
-              try:
-                  for candidate in candidates_from_page(page_url):
-                      if fetch_candidate(candidate, dest, min_size):
-                          ok = True
-                          break
-              except Exception as e:
-                  print('page scrape failed:', type(e).__name__, str(e)[:220])
-              if not ok:
-                  ok = ytdlp_fallback(page_url, dest)
-              if not ok or not dest.exists() or dest.stat().st_size < min_size:
-                  raise SystemExit(f'Could not retrieve original-quality MP3 for {name}')
-
-              probe = subprocess.check_output([
-                  'ffprobe', '-v', 'error', '-select_streams', 'a:0',
-                  '-show_entries', 'stream=codec_name,bit_rate:format=duration',
-                  '-of', 'default=noprint_wrappers=1', str(dest)
+          import subprocess
+          raw = Path('buildsrc/quiet-diary/app/src/main/res/raw')
+          expected = {
+              'gentle_nature.mp3': (600.03, 18_000_000),
+              'calm_energy.mp3': (240.02, 7_000_000),
+              'quiet_meditation.mp3': (385.23, 11_000_000),
+          }
+          for name, (seconds, min_size) in expected.items():
+              path = raw / name
+              if not path.exists() or path.stat().st_size < min_size:
+                  raise SystemExit(f'{name}: missing or unexpectedly small')
+              text = subprocess.check_output([
+                  'ffprobe','-v','error','-select_streams','a:0',
+                  '-show_entries','stream=codec_name,bit_rate:format=duration',
+                  '-of','default=noprint_wrappers=1',str(path)
               ], text=True)
-              print(name, probe.strip().replace('\n', ' | '))
-              values = dict(line.split('=', 1) for line in probe.splitlines() if '=' in line)
-              if values.get('codec_name') != 'mp3':
-                  raise SystemExit(f'{name}: expected MP3, got {values.get("codec_name")}')
-              duration = float(values.get('duration', '0'))
-              if abs(duration - expected_seconds) > 4.0:
+              data = dict(line.split('=',1) for line in text.splitlines() if '=' in line)
+              print(name, path.stat().st_size, data)
+              if data.get('codec_name') != 'mp3':
+                  raise SystemExit(f'{name}: not MP3')
+              duration = float(data.get('duration','0'))
+              if abs(duration-seconds) > 4:
                   raise SystemExit(f'{name}: unexpected duration {duration}')
-              bitrate = int(values.get('bit_rate', '0') or 0)
+              bitrate = int(data.get('bit_rate','0') or 0)
               if bitrate and bitrate < 240000:
-                  raise SystemExit(f'{name}: bitrate unexpectedly low: {bitrate}')
-          PYMUSIC
+                  raise SystemExit(f'{name}: bitrate unexpectedly low {bitrate}')
+          PYCHECK
 
           grep -q 'versionCode = 282' buildsrc/quiet-diary/app/build.gradle.kts
           grep -q 'versionName = "0.28.2"' buildsrc/quiet-diary/app/build.gradle.kts
-          grep -q 'R.raw.sea_harp' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'R.raw.gentle_nature' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
           grep -q 'R.raw.calm_energy' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
           grep -q 'R.raw.quiet_meditation' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
-          grep -q 'Три мелодии уже сохранены' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
-          ! grep -q 'soundRainCard' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'Природа и медитация' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'Спокойная энергия' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'Тихая медитация' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
           ! grep -R -q 'R.raw.rain_soft\|R.raw.ocean_swell\|R.raw.forest_evening\|R.raw.stream_flow' buildsrc/quiet-diary/app/src/main/java
-          test -s buildsrc/quiet-diary/app/src/main/res/raw/sea_harp.mp3
-          test -s buildsrc/quiet-diary/app/src/main/res/raw/calm_energy.mp3
-          test -s buildsrc/quiet-diary/app/src/main/res/raw/quiet_meditation.mp3
 
           python3 - <<'PYXML'
           from pathlib import Path
           import xml.etree.ElementTree as ET
           ET.parse('buildsrc/quiet-diary/app/src/main/AndroidManifest.xml')
-          for path in Path('buildsrc/quiet-diary/app/src/main/res/layout').glob('*.xml'):
-              ET.parse(path)
-          for path in Path('buildsrc/quiet-diary/app/src/main/res/drawable').glob('*.xml'):
-              ET.parse(path)
+          for folder in ('layout','drawable'):
+              for path in Path(f'buildsrc/quiet-diary/app/src/main/res/{folder}').glob('*.xml'):
+                  ET.parse(path)
           PYXML
 
       - name: Upload restore log
