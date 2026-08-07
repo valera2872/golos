@@ -1,0 +1,137 @@
+name: Build Nightseed 0.28.3 UX APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.3 project
+        id: restore
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc
+          exec > >(tee buildsrc/restore-v283.log) 2>&1
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          import textwrap
+          workflow = Path('.github/workflows/android-v281.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.28.1 project'
+          start_step = workflow.index(marker)
+          run_line = next(i for i in range(start_step, len(workflow)) if workflow[i].strip() == 'run: |')
+          end_step = next(i for i in range(run_line + 1, len(workflow)) if workflow[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(workflow[run_line + 1:end_step])) + '\n'
+          Path('/tmp/restore-nightseed-v281.sh').write_text(script, encoding='utf-8')
+          PYRESTORE
+          bash /tmp/restore-nightseed-v281.sh
+
+          cat source-v283/patch_* > buildsrc/v281-to-v283.patch.gz.b64
+          test "$(wc -c < buildsrc/v281-to-v283.patch.gz.b64)" -eq 17476
+          echo 'd5e54d240e7dd28fad59f9f1e1e6093d86e1e1be5b37e9d613b602b250068319  source-v283/patch_000' | sha256sum -c -
+          base64 --decode buildsrc/v281-to-v283.patch.gz.b64 | gunzip > buildsrc/v281-to-v283.patch
+          echo 'af79e5df7fbd0ec05d38cabc34420411846e3492f58fcaaa8a96de35195a17bf  buildsrc/v281-to-v283.patch' | sha256sum -c -
+
+          ! grep -q 'NightCaptureService.java' buildsrc/v281-to-v283.patch
+          ! grep -q 'GoogleSpeechTranscriber.kt' buildsrc/v281-to-v283.patch
+          ! grep -q 'AcousticWakeDetector.java' buildsrc/v281-to-v283.patch
+          ! grep -q 'LiveCommandRecognizer.kt' buildsrc/v281-to-v283.patch
+          ! grep -q 'WakeTemplateStore.java' buildsrc/v281-to-v283.patch
+
+          patch -p1 -d buildsrc/quiet-diary < buildsrc/v281-to-v283.patch
+          rm -f buildsrc/quiet-diary/app/src/main/res/raw/rain_soft.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/ocean_swell.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/forest_evening.ogg \
+                buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg
+
+          command -v ffmpeg >/dev/null || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          mkdir -p buildsrc/quiet-diary/app/src/main/res/raw
+          ffmpeg -loglevel error -y -f lavfi -i anullsrc=r=44100:cl=stereo -t 0.25 -c:a libmp3lame -b:a 64k buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3
+          cp buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3 buildsrc/quiet-diary/app/src/main/res/raw/music_calm_energy.mp3
+          cp buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3 buildsrc/quiet-diary/app/src/main/res/raw/music_quiet_meditation.mp3
+
+          grep -q 'versionCode = 283' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.28.3"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'Что ты хочешь сейчас?' buildsrc/quiet-diary/app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'Нажми любую мелодию' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'Это не магия и не приказ мозгу' buildsrc/quiet-diary/app/src/main/res/layout/activity_coue_theory.xml
+          grep -q 'QUICK_REPEAT_MS = 6000L' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/CouePracticeActivity.java
+          grep -q 'R.raw.music_sea_harp' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          ! grep -R -q 'R.raw.rain_soft\|R.raw.ocean_swell\|R.raw.forest_evening\|R.raw.stream_flow' buildsrc/quiet-diary/app/src/main/java
+
+          python3 - <<'PYXML'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          ET.parse('buildsrc/quiet-diary/app/src/main/AndroidManifest.xml')
+          for folder in ('layout', 'drawable'):
+              for path in Path('buildsrc/quiet-diary/app/src/main/res', folder).glob('*.xml'):
+                  ET.parse(path)
+          PYXML
+
+      - name: Upload restore log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.3-restore-log
+          path: buildsrc/restore-v283.log
+          retention-days: 7
+
+      - name: Fail after restore log upload
+        if: steps.restore.outcome == 'failure'
+        run: exit 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Test and build
+        id: compile
+        continue-on-error: true
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain > buildsrc/gradle-build-v283.log 2>&1
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.3-compiler-log
+          path: buildsrc/gradle-build-v283.log
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Prepare placeholder APK
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.3-placeholder-debug.apk
+
+      - name: Upload placeholder APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.3-placeholder-debug-apk
+          path: Nightseed-0.28.3-placeholder-debug.apk
+          retention-days: 7
