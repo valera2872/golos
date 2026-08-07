@@ -72,7 +72,7 @@ jobs:
           rm -f buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg
 
           # Keep the source MP3 stream: no transcoding, resampling or bitrate reduction.
-          python3 -m pip install --quiet requests yt-dlp
+          python3 -m pip install --quiet requests "yt-dlp[default,curl-cffi]"
           python3 - <<'PYMUSIC'
           from pathlib import Path
           import html, re, subprocess, sys
@@ -127,6 +127,7 @@ jobs:
           def ytdlp_fallback(page_url, dest):
               dest.unlink(missing_ok=True)
               cmd = [sys.executable, '-m', 'yt_dlp', '--no-playlist', '--no-progress',
+                     '--impersonate', 'chrome', '--extractor-args', 'generic:impersonate',
                      '--user-agent', session.headers['User-Agent'], '-f', 'ba', '-o', str(dest), page_url]
               print('trying yt-dlp fallback for', page_url)
               result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -224,7 +225,7 @@ jobs:
         run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug :app:assembleRelease --stacktrace --console=plain > buildsrc/gradle-build-v282.log 2>&1
 
       - name: Upload compiler log
-        if: always()
+        if: steps.restore.outcome != 'failure' && always()
         uses: actions/upload-artifact@v4
         with:
           name: nightseed-0.28.2-compiler-log
