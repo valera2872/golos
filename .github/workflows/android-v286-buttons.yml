@@ -33,11 +33,13 @@ jobs:
               script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
               Path(output).write_text(script, encoding='utf-8')
 
-          extract('Restore 0.28.4', '/tmp/restore-v284.sh')
-          extract('Apply 0.28.5 and normalize restored legacy resources', '/tmp/apply-v285.sh')
+          # Do not use /tmp/restore-v284.sh here: the extracted 0.28.5 step itself
+          # creates that path while running, so self-overwriting would corrupt bash input.
+          extract('Restore 0.28.4', '/tmp/run-v285-restore-step.sh')
+          extract('Apply 0.28.5 and normalize restored legacy resources', '/tmp/run-v285-apply-step.sh')
           PY
-          bash /tmp/restore-v284.sh
-          bash /tmp/apply-v285.sh
+          bash /tmp/run-v285-restore-step.sh
+          bash /tmp/run-v285-apply-step.sh
 
       - name: Make all button labels adaptive
         shell: bash
@@ -51,7 +53,6 @@ jobs:
           root = Path('buildsrc/quiet-diary')
           layout_dir = root / 'app/src/main/res/layout'
 
-          # Cover MaterialButton and ordinary Android/AppCompat buttons.
           button_re = re.compile(
               r'<(?:com\.google\.android\.material\.button\.MaterialButton|androidx\.appcompat\.widget\.AppCompatButton|android\.widget\.Button|Button)\b.*?/>',
               re.S,
@@ -65,7 +66,6 @@ jobs:
               return m.group(1) if m else '        '
 
           def repair(block, filename):
-              nonlocal_dummy = None
               global inspected
               inspected += 1
               original = block
@@ -82,7 +82,6 @@ jobs:
                           1,
                       )
 
-              # Explicit height/maxHeight can still clip a wrapped button.
               block = re.sub(r'\n\s*android:height="\d+dp"', '', block)
               block = re.sub(r'\n\s*android:maxHeight="\d+dp"', '', block)
 
@@ -111,14 +110,12 @@ jobs:
               if updated != source:
                   path.write_text(updated, encoding='utf-8')
 
-          # Version only; application logic and frozen recognition stack are untouched.
           gp = root / 'app/build.gradle.kts'
           gradle = gp.read_text(encoding='utf-8')
           gradle = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 286', gradle, count=1)
           gradle = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.6"', gradle, count=1)
           gp.write_text(gradle, encoding='utf-8')
 
-          # Strong regression guards: no button is allowed to force one-line clipping.
           failures = []
           for path in sorted(layout_dir.glob('*.xml')):
               source = path.read_text(encoding='utf-8')
