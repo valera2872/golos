@@ -1,0 +1,109 @@
+name: Build Nightseed 0.28.4 UX APK final-fix
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore 0.28.4 from primary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v284.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.28.4 project'
+          start = lines.index(marker)
+          run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+          end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - name: Upload restore log'))
+          script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
+          Path('/tmp/restore-v284.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/restore-v284.sh
+
+      - name: Normalize legacy UI/resource references
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('buildsrc/quiet-diary/app/src/main/res/layout')
+          changed = 0
+          for path in root.glob('*.xml'):
+              text = path.read_text(encoding='utf-8')
+              new = text.replace('style="?attr/materialButtonTextButtonStyle"', '')
+              if new != text:
+                  path.write_text(new, encoding='utf-8')
+                  changed += 1
+          print('Layouts normalized:', changed)
+
+          service = Path('buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundscapeService.java')
+          text = service.read_text(encoding='utf-8')
+          new = text.replace('R.raw.rain_soft', 'R.raw.music_sea_harp')
+          service.write_text(new, encoding='utf-8')
+          print('Soundscape fallback normalized:', text != new)
+          PY
+          ! grep -R '?attr/materialButtonTextButtonStyle' buildsrc/quiet-diary/app/src/main/res/layout
+          ! grep -q 'R.raw.rain_soft' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundscapeService.java
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Test and build
+        id: compile
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain 2>&1 | tee buildsrc/gradle-build-v284-final.log
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.4-compiler-log-final
+          path: buildsrc/gradle-build-v284-final.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail after compiler log upload
+        if: steps.compile.outcome == 'failure'
+        run: exit 1
+
+      - name: Prepare placeholder APK
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.4-placeholder-debug.apk
+
+      - name: Upload placeholder APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.4-placeholder-debug-apk-final
+          path: Nightseed-0.28.4-placeholder-debug.apk
+          if-no-files-found: error
+          retention-days: 7
