@@ -44,7 +44,7 @@ jobs:
           git apply --check ../v284-to-v285.patch
           git apply ../v284-to-v285.patch
 
-      - name: Normalize legacy Material attributes
+      - name: Normalize legacy compatibility
         shell: bash
         run: |
           set -euo pipefail
@@ -63,8 +63,14 @@ jobs:
                   tint_changed += 1
               if newer != text:
                   path.write_text(newer, encoding='utf-8')
+          sound_path = Path('buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundscapeService.java')
+          sound = sound_path.read_text(encoding='utf-8')
+          rain_refs = sound.count('R.raw.rain_soft')
+          if rain_refs:
+              sound_path.write_text(sound.replace('R.raw.rain_soft', 'R.raw.music_sea_harp'), encoding='utf-8')
           print('Legacy text-button styles removed from:', style_changed, 'layouts')
           print('Switch tint attrs normalized in:', tint_changed, 'layouts')
+          print('Legacy rain fallbacks replaced:', rain_refs)
           PY
 
       - name: Validate UX resources
