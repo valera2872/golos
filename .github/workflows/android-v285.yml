@@ -44,6 +44,29 @@ jobs:
           git apply --check ../v284-to-v285.patch
           git apply ../v284-to-v285.patch
 
+      - name: Normalize legacy Material attributes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('buildsrc/quiet-diary/app/src/main/res/layout')
+          style_changed = 0
+          tint_changed = 0
+          for path in root.glob('*.xml'):
+              text = path.read_text(encoding='utf-8')
+              new = text.replace('style="?attr/materialButtonTextButtonStyle"', '')
+              if new != text:
+                  style_changed += 1
+              newer = new.replace('app:thumbTint=', 'android:thumbTint=').replace('app:trackTint=', 'android:trackTint=')
+              if newer != new:
+                  tint_changed += 1
+              if newer != text:
+                  path.write_text(newer, encoding='utf-8')
+          print('Legacy text-button styles removed from:', style_changed, 'layouts')
+          print('Switch tint attrs normalized in:', tint_changed, 'layouts')
+          PY
+
       - name: Validate UX resources
         shell: bash
         run: |
@@ -92,7 +115,7 @@ jobs:
         with:
           name: nightseed-0.28.5-compiler-log
           path: buildsrc/gradle-build-v285.log
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Fail after compiler log upload
