@@ -71,17 +71,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -R '?attr/materialButtonTextButtonStyle' buildsrc/quiet-diary/app/src/main/res/layout
-          ! grep -q 'R.raw.rain_soft' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundscapeService.java
-          grep -q 'versionName = "0.28.5"' buildsrc/quiet-diary/app/build.gradle.kts
-          grep -q 'Начать практику' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
-          grep -q 'Я проснулся' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/WakeAlarmActivity.java
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          for p in Path('buildsrc/quiet-diary/app/src/main/res').rglob('*.xml'):
+          root = Path('buildsrc/quiet-diary')
+          layouts = root / 'app/src/main/res/layout'
+          bad_style = []
+          for p in layouts.glob('*.xml'):
+              text = p.read_text(encoding='utf-8')
+              if '?attr/materialButtonTextButtonStyle' in text:
+                  bad_style.append(p.name)
+          assert not bad_style, f'Legacy Material text style remains: {bad_style}'
+          soundscape = (root / 'app/src/main/java/com/quietdiary/app/SoundscapeService.java').read_text(encoding='utf-8')
+          assert 'R.raw.rain_soft' not in soundscape, 'Removed synthetic rain is still referenced'
+          gradle = (root / 'app/build.gradle.kts').read_text(encoding='utf-8')
+          assert 'versionName = "0.28.5"' in gradle, 'versionName is not 0.28.5'
+          self_suggestion = (root / 'app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java').read_text(encoding='utf-8')
+          assert 'Начать практику' in self_suggestion, 'Start-phrase training is missing'
+          wake = (root / 'app/src/main/java/com/quietdiary/app/WakeAlarmActivity.java').read_text(encoding='utf-8')
+          assert 'Я проснулся' in wake, 'Wake voice confirmation is missing'
+          for p in (root / 'app/src/main/res').rglob('*.xml'):
               ET.parse(p)
-          print('XML OK')
+          print('UX validation OK: version, phrase training, wake confirmation, XML and legacy styles')
           PY
 
       - name: Set up Java 17
