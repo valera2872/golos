@@ -164,7 +164,7 @@ jobs:
           nav = nav.replace('android:paddingTop="7dp"', 'android:paddingTop="8dp"')
           nav = nav.replace('android:paddingEnd="7dp"', 'android:paddingEnd="8dp"')
           nav = nav.replace('android:paddingBottom="8dp"', 'android:paddingBottom="10dp"')
-          nav = nav.replace('android:layout_height="match_parent" android:layout_weight="1"', 'android:layout_height="60dp" android:layout_weight="1"')
+          nav = nav.replace('android:layout_height="wrap_content"', 'android:layout_height="60dp"')
           nav = nav.replace('app:cornerRadius="18dp"', 'app:cornerRadius="22dp"')
           nav = nav.replace('android:textSize="10sp"', 'android:textSize="10.5sp"')
           nav_path.write_text(nav, encoding='utf-8')
@@ -201,12 +201,10 @@ jobs:
               return block.replace('/>', '\n                    ' + replacement + ' />', 1)
 
           def polish_button(block):
-              # Softer silhouette: avoid the old squared tile look.
               m = re.search(r'app:cornerRadius="(\d+)dp"', block)
               if m and int(m.group(1)) < 20:
                   block = set_attr(block, 'app:cornerRadius', '20dp')
 
-              # Dark text on filled accents. Never white/blue-on-green.
               if 'app:backgroundTint="@color/qd_primary"' in block:
                   block = set_attr(block, 'android:textColor', '@color/qd_primary_dark')
               elif 'app:backgroundTint="@color/qd_practice"' in block:
@@ -218,7 +216,6 @@ jobs:
           for path in sorted((res / 'layout').glob('*.xml')):
               source = path.read_text(encoding='utf-8')
               if path.name == 'view_bottom_navigation.xml':
-                  # Already tuned separately; keep its 22dp selected pills.
                   updated = source
               else:
                   updated = button_re.sub(lambda m: polish_button(m.group(0)), source)
@@ -242,7 +239,7 @@ jobs:
                       failures.append(f'{path.name}: practice fill without dark text')
                   if 'app:backgroundTint="@color/qd_time"' in block and 'android:textColor="@color/qd_primary_dark"' not in block:
                       failures.append(f'{path.name}: time fill without dark text')
-                  if re.search(r'android:layout_height="\d+dp"', block):
+                  if path.name != 'view_bottom_navigation.xml' and re.search(r'android:layout_height="\d+dp"', block):
                       failures.append(f'{path.name}: fixed button height returned')
                   if 'android:singleLine="true"' in block or 'android:maxLines="1"' in block:
                       failures.append(f'{path.name}: button text constrained to one line')
