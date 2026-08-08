@@ -1,0 +1,85 @@
+name: Build Nightseed 0.28.5 final test
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-4-night-ux ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore 0.28.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v284.yml').read_text(encoding='utf-8').splitlines()
+          start = lines.index('      - name: Restore Nightseed 0.28.4 project')
+          run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+          end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - name: Upload restore log'))
+          Path('/tmp/restore-v284.sh').write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          PY
+          bash /tmp/restore-v284.sh
+
+      - name: Apply 0.28.5 and normalize restored legacy resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat source-v285/b64_00 source-v285/b64_01 source-v285/b64_02 source-v285/b64_03 | base64 -d | gzip -d > buildsrc/v284-to-v285.patch
+          echo '4b3a3efbd84423150ea55d2f4c5f2b8273cf32c7456257a72f4fcd43a3bd2d8e  buildsrc/v284-to-v285.patch' | sha256sum -c -
+          ! grep -Eq '^diff --git a/app/src/main/java/com/quietdiary/app/(NightCaptureService.java|GoogleSpeechTranscriber.kt|AcousticWakeDetector.java|LiveCommandRecognizer.kt|WakeTemplateStore.java|CouePracticeService.java) ' buildsrc/v284-to-v285.patch
+          cd buildsrc/quiet-diary
+          git apply --check ../v284-to-v285.patch
+          git apply ../v284-to-v285.patch
+          cd ../..
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('buildsrc/quiet-diary')
+          for p in (root/'app/src/main/res/layout').glob('*.xml'):
+              s = p.read_text(encoding='utf-8')
+              s = s.replace('style="?attr/materialButtonTextButtonStyle"', '')
+              s = s.replace('app:thumbTint=', 'android:thumbTint=').replace('app:trackTint=', 'android:trackTint=')
+              p.write_text(s, encoding='utf-8')
+          sp = root/'app/src/main/java/com/quietdiary/app/SoundscapeService.java'
+          sp.write_text(sp.read_text(encoding='utf-8').replace('R.raw.rain_soft','R.raw.music_sea_harp'),encoding='utf-8')
+          gp = root/'app/build.gradle.kts'
+          g = gp.read_text(encoding='utf-8')
+          g = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 285', g, count=1)
+          g = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.5"', g, count=1)
+          gp.write_text(g,encoding='utf-8')
+          for p in (root/'app/src/main/res').rglob('*.xml'): ET.parse(p)
+          print([x.strip() for x in g.splitlines() if 'versionCode' in x or 'versionName' in x])
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare APK
+        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.5-placeholder-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.5-placeholder-debug-apk-final
+          path: Nightseed-0.28.5-placeholder-debug.apk
+          retention-days: 7
