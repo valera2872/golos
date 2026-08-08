@@ -50,6 +50,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
           root = Path('buildsrc/quiet-diary/app/src/main/res/layout')
           style_changed = 0
           tint_changed = 0
@@ -63,14 +64,24 @@ jobs:
                   tint_changed += 1
               if newer != text:
                   path.write_text(newer, encoding='utf-8')
+
           sound_path = Path('buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/SoundscapeService.java')
           sound = sound_path.read_text(encoding='utf-8')
           rain_refs = sound.count('R.raw.rain_soft')
           if rain_refs:
               sound_path.write_text(sound.replace('R.raw.rain_soft', 'R.raw.music_sea_harp'), encoding='utf-8')
+
+          gradle_path = Path('buildsrc/quiet-diary/app/build.gradle.kts')
+          gradle = gradle_path.read_text(encoding='utf-8')
+          gradle, code_n = re.subn(r'versionCode\s*=\s*\d+', 'versionCode = 285', gradle, count=1)
+          gradle, name_n = re.subn(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.5"', gradle, count=1)
+          assert code_n == 1 and name_n == 1, 'Could not normalize version metadata'
+          gradle_path.write_text(gradle, encoding='utf-8')
+
           print('Legacy text-button styles removed from:', style_changed, 'layouts')
           print('Switch tint attrs normalized in:', tint_changed, 'layouts')
           print('Legacy rain fallbacks replaced:', rain_refs)
+          print('Version lines:', [line.strip() for line in gradle.splitlines() if 'versionCode' in line or 'versionName' in line])
           PY
 
       - name: Validate UX resources
@@ -91,6 +102,7 @@ jobs:
           soundscape = (root / 'app/src/main/java/com/quietdiary/app/SoundscapeService.java').read_text(encoding='utf-8')
           assert 'R.raw.rain_soft' not in soundscape, 'Removed synthetic rain is still referenced'
           gradle = (root / 'app/build.gradle.kts').read_text(encoding='utf-8')
+          assert 'versionCode = 285' in gradle, 'versionCode is not 285'
           assert 'versionName = "0.28.5"' in gradle, 'versionName is not 0.28.5'
           self_suggestion = (root / 'app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java').read_text(encoding='utf-8')
           assert 'Начать практику' in self_suggestion, 'Start-phrase training is missing'
