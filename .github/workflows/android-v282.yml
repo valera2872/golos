@@ -46,6 +46,7 @@ jobs:
           base64 --decode buildsrc/v281-to-v282.patch.gz.b64 | gunzip > buildsrc/v281-to-v282.patch
           echo '4daafd0e04d8350856c5b317dbe541638ec524b8c3e575568bfab72c82d6366b  buildsrc/v281-to-v282.patch' | sha256sum -c -
 
+          # The proven night-recognition stack must remain byte-for-byte outside this patch.
           ! grep -q 'NightCaptureService.java' buildsrc/v281-to-v282.patch
           ! grep -q 'GoogleSpeechTranscriber.kt' buildsrc/v281-to-v282.patch
           ! grep -q 'AcousticWakeDetector.java' buildsrc/v281-to-v282.patch
@@ -58,47 +59,18 @@ jobs:
                 buildsrc/quiet-diary/app/src/main/res/raw/forest_evening.ogg \
                 buildsrc/quiet-diary/app/src/main/res/raw/stream_flow.ogg
 
-          python3 - <<'PYAUDIO'
-          import hashlib, html, re, sys, urllib.request
-          from pathlib import Path
+          # Pixabay blocks hosted CI runners. Build with tiny valid placeholders;
+          # the exact user-supplied MP3 masters are injected after the APK is downloaded.
+          mkdir -p buildsrc/quiet-diary/app/src/main/res/raw
+          ffmpeg -loglevel error -y -f lavfi -i anullsrc=r=44100:cl=stereo -t 0.25 -c:a libmp3lame -b:a 64k buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3
+          cp buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3 buildsrc/quiet-diary/app/src/main/res/raw/music_calm_energy.mp3
+          cp buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3 buildsrc/quiet-diary/app/src/main/res/raw/music_quiet_meditation.mp3
 
-          tracks = [
-              ('https://pixabay.com/music/modern-classical-beside-the-sea-harp-and-ocean-525286/', 'music_sea_harp.mp3', '98fa11c74b316deb9bd72905ccb0da1efb2feb7774d5bc79f8f2c2b47d78b4f0'),
-              ('https://pixabay.com/music/meditationspiritual-calm-energy-meditation-888hz-peaceful-231909/', 'music_calm_energy.mp3', '134d81971b01b4bb43ba0680b74cdfef58312dd4c211e510e9899a614217f6b2'),
-              ('https://pixabay.com/music/meditationspiritual-music-for-relax-yoga-meditation-7783/', 'music_quiet_meditation.mp3', '76527a75f5dcb011418e543c27c86143532208e9695aa74344d1050fabb5ad27'),
-          ]
-          headers = {'User-Agent':'Mozilla/5.0'}
-          out = Path('buildsrc/quiet-diary/app/src/main/res/raw')
-          out.mkdir(parents=True, exist_ok=True)
-          for page, filename, expected in tracks:
-              req = urllib.request.Request(page, headers=headers)
-              source = urllib.request.urlopen(req, timeout=30).read().decode('utf-8', 'ignore')
-              source = html.unescape(source).replace('\\/','/')
-              candidates = re.findall(r'https://cdn\\.pixabay\\.com/(?:download/)?audio/[^"\'<> ]+?\\.mp3(?:\\?[^"\'<> ]*)?', source)
-              seen=[]
-              for url in candidates:
-                  if url in seen: continue
-                  seen.append(url)
-                  try:
-                      data = urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60).read()
-                  except Exception:
-                      continue
-                  digest = hashlib.sha256(data).hexdigest()
-                  if digest == expected:
-                      (out / filename).write_bytes(data)
-                      print(filename, len(data), digest)
-                      break
-              else:
-                  print('Could not locate exact Pixabay source for', filename, 'candidates', len(seen), file=sys.stderr)
-                  sys.exit(2)
-          PYAUDIO
-
-          echo '98fa11c74b316deb9bd72905ccb0da1efb2feb7774d5bc79f8f2c2b47d78b4f0  buildsrc/quiet-diary/app/src/main/res/raw/music_sea_harp.mp3' | sha256sum -c -
-          echo '134d81971b01b4bb43ba0680b74cdfef58312dd4c211e510e9899a614217f6b2  buildsrc/quiet-diary/app/src/main/res/raw/music_calm_energy.mp3' | sha256sum -c -
-          echo '76527a75f5dcb011418e543c27c86143532208e9695aa74344d1050fabb5ad27  buildsrc/quiet-diary/app/src/main/res/raw/music_quiet_meditation.mp3' | sha256sum -c -
           grep -q 'versionCode = 282' buildsrc/quiet-diary/app/build.gradle.kts
           grep -q 'versionName = "0.28.2"' buildsrc/quiet-diary/app/build.gradle.kts
           grep -q 'Море и арфа' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'Спокойная энергия' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'Тихая медитация' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
           ! grep -q 'Мягкий дождь' buildsrc/quiet-diary/app/src/main/res/layout/activity_sound_library.xml
 
       - name: Upload restore log
@@ -150,13 +122,28 @@ jobs:
         if: steps.compile.outcome == 'failure'
         run: exit 1
 
-      - name: Prepare artifact
-        run: cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.2-debug.apk
+      - name: Prepare artifacts and signing kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.2-placeholder-debug.apk
+          mkdir -p signing-kit
+          cp "$HOME/.android/debug.keystore" signing-kit/debug.keystore
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" signing-kit/apksigner.jar
+          printf '%s\n' 'alias=androiddebugkey' 'storepass=android' 'keypass=android' > signing-kit/debug-signing.txt
 
-      - name: Upload debug APK
+      - name: Upload placeholder debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: nightseed-0.28.2-debug-apk
-          path: Nightseed-0.28.2-debug.apk
+          name: nightseed-0.28.2-placeholder-debug-apk
+          path: Nightseed-0.28.2-placeholder-debug.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
+
+      - name: Upload signing kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.2-signing-kit
+          path: signing-kit
+          if-no-files-found: error
+          retention-days: 7
