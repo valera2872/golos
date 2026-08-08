@@ -1,0 +1,183 @@
+name: Build Nightseed 0.28.6 button fix
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.5 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          lines = Path('.github/workflows/android-v285-compile.yml').read_text(encoding='utf-8').splitlines()
+
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
+              Path(output).write_text(script, encoding='utf-8')
+
+          extract('Restore 0.28.4', '/tmp/restore-v284.sh')
+          extract('Apply 0.28.5 and normalize restored legacy resources', '/tmp/apply-v285.sh')
+          PY
+          bash /tmp/restore-v284.sh
+          bash /tmp/apply-v285.sh
+
+      - name: Make all button labels adaptive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import xml.etree.ElementTree as ET
+
+          root = Path('buildsrc/quiet-diary')
+          layout_dir = root / 'app/src/main/res/layout'
+
+          # Cover MaterialButton and ordinary Android/AppCompat buttons.
+          button_re = re.compile(
+              r'<(?:com\.google\.android\.material\.button\.MaterialButton|androidx\.appcompat\.widget\.AppCompatButton|android\.widget\.Button|Button)\b.*?/>',
+              re.S,
+          )
+
+          changed = []
+          inspected = 0
+
+          def attr_indent(block, attr='android:layout_height'):
+              m = re.search(r'\n(\s+)' + re.escape(attr) + r'=', block)
+              return m.group(1) if m else '        '
+
+          def repair(block, filename):
+              nonlocal_dummy = None
+              global inspected
+              inspected += 1
+              original = block
+              indent = attr_indent(block)
+
+              height = re.search(r'android:layout_height="(\d+)dp"', block)
+              if height:
+                  old = height.group(1)
+                  block = re.sub(r'android:layout_height="\d+dp"', 'android:layout_height="wrap_content"', block, count=1)
+                  if 'android:minHeight=' not in block:
+                      block = block.replace(
+                          'android:layout_height="wrap_content"',
+                          'android:layout_height="wrap_content"\n' + indent + f'android:minHeight="{old}dp"',
+                          1,
+                      )
+
+              # Explicit height/maxHeight can still clip a wrapped button.
+              block = re.sub(r'\n\s*android:height="\d+dp"', '', block)
+              block = re.sub(r'\n\s*android:maxHeight="\d+dp"', '', block)
+
+              if 'android:singleLine="true"' in block:
+                  block = block.replace('android:singleLine="true"', 'android:singleLine="false"')
+
+              block = re.sub(r'android:maxLines="1"', 'android:maxLines="3"', block)
+              block = re.sub(r'\n\s*android:lines="1"', '', block)
+              block = re.sub(r'\n\s*android:ellipsize="(?:end|middle|start|marquee)"', '', block)
+
+              if 'android:maxLines=' not in block:
+                  insertion = re.search(r'android:layout_height="[^"]+"', block)
+                  if insertion:
+                      token = insertion.group(0)
+                      block = block.replace(token, token + '\n' + indent + 'android:maxLines="3"', 1)
+
+              if block != original:
+                  label_match = re.search(r'android:text="([^"]+)"', original)
+                  label = label_match.group(1) if label_match else '(resource/dynamic text)'
+                  changed.append((filename, label))
+              return block
+
+          for path in sorted(layout_dir.glob('*.xml')):
+              source = path.read_text(encoding='utf-8')
+              updated = button_re.sub(lambda m: repair(m.group(0), path.name), source)
+              if updated != source:
+                  path.write_text(updated, encoding='utf-8')
+
+          # Version only; application logic and frozen recognition stack are untouched.
+          gp = root / 'app/build.gradle.kts'
+          gradle = gp.read_text(encoding='utf-8')
+          gradle = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 286', gradle, count=1)
+          gradle = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.6"', gradle, count=1)
+          gp.write_text(gradle, encoding='utf-8')
+
+          # Strong regression guards: no button is allowed to force one-line clipping.
+          failures = []
+          for path in sorted(layout_dir.glob('*.xml')):
+              source = path.read_text(encoding='utf-8')
+              for m in button_re.finditer(source):
+                  block = m.group(0)
+                  if re.search(r'android:layout_height="\d+dp"', block):
+                      failures.append(f'{path.name}: fixed layout_height')
+                  if 'android:singleLine="true"' in block:
+                      failures.append(f'{path.name}: singleLine=true')
+                  if 'android:maxLines="1"' in block:
+                      failures.append(f'{path.name}: maxLines=1')
+                  if re.search(r'android:ellipsize="(?:end|middle|start|marquee)"', block):
+                      failures.append(f'{path.name}: ellipsize')
+
+          if failures:
+              raise SystemExit('Button clipping guards failed:\n' + '\n'.join(failures))
+
+          for path in (root / 'app/src/main/res').rglob('*.xml'):
+              ET.parse(path)
+
+          assert changed, 'No button attributes were changed; expected adaptive-button repair.'
+          print(f'Inspected {inspected} buttons; repaired {len(changed)} button definitions.')
+          for filename, label in changed:
+              print(f'  {filename}: {label}')
+          print('Button clipping guards: OK')
+          PY
+
+          grep -q 'versionCode = 286' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.28.6"' buildsrc/quiet-diary/app/build.gradle.kts
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.6-buttons-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.6-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.6-buttons-debug-apk
+          path: Nightseed-0.28.6-buttons-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.6-restored-source
+          path: Nightseed-0.28.6-restored-source.zip
+          retention-days: 14
