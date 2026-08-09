@@ -116,7 +116,7 @@ jobs:
           base64 -d /tmp/v288-to-v289.patch.gz.b64 > /tmp/v288-to-v289.patch.gz
           gzip -dc /tmp/v288-to-v289.patch.gz > /tmp/v288-to-v289.patch
           cd buildsrc/quiet-diary
-          patch -p3 < /tmp/v288-to-v289.patch
+          patch -p2 < /tmp/v288-to-v289.patch
 
           # Acceptance guards: a bedtime program can no longer finish before night capture starts.
           grep -q 'versionCode = 289' app/build.gradle.kts
