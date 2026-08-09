@@ -1,0 +1,102 @@
+name: Build Nightseed 0.28.9 final night + clock
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.8 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v288-practice-fix.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore Nightseed 0.28.6 project', '/tmp/run-v288-restore.sh')
+          extract('Apply 0.28.8 practice fixes and visual rollback', '/tmp/run-v288-apply.sh')
+          PY
+          bash /tmp/run-v288-restore.sh
+          bash /tmp/run-v288-apply.sh
+
+      - name: Apply 0.28.9 logic with deterministic version bump
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v289-night-clock.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Apply 0.28.9 mandatory night handoff and voice clock fix'
+          start = lines.index(marker)
+          run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+          end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+          script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
+          old = 'patch -p2 < /tmp/v288-to-v289.patch\n'
+          fix = '''patch -p2 < /tmp/v288-to-v289.patch || true
+          python3 - <<'PYFIX'
+          from pathlib import Path
+          import re
+          p = Path('app/build.gradle.kts')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'versionCode\\s*=\\s*\\d+', 'versionCode = 289', s, count=1)
+          s = re.sub(r'versionName\\s*=\\s*"[^"]+"', 'versionName = "0.28.9"', s, count=1)
+          p.write_text(s, encoding='utf-8')
+          PYFIX
+          rm -f build.gradle.kts.rej
+          '''
+          if old not in script:
+              raise SystemExit('Expected patch command not found in 0.28.9 workflow')
+          script = script.replace(old, fix, 1)
+          Path('/tmp/run-v289-fixed.sh').write_text(script, encoding='utf-8')
+          PY
+          bash /tmp/run-v289-fixed.sh
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.9-night-clock-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.9-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.9-night-clock-debug-apk
+          path: Nightseed-0.28.9-night-clock-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.9-restored-source
+          path: Nightseed-0.28.9-restored-source.zip
+          retention-days: 14
