@@ -1,0 +1,130 @@
+name: Build Nightseed 0.28.9 night handoff + clock
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.8 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY2'
+          from pathlib import Path
+          import textwrap
+
+          lines = Path('.github/workflows/android-v288-practice-fix.yml').read_text(encoding='utf-8').splitlines()
+
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
+              Path(output).write_text(script, encoding='utf-8')
+
+          extract('Restore Nightseed 0.28.6 project', '/tmp/run-v288-restore.sh')
+          extract('Apply 0.28.8 practice fixes and visual rollback', '/tmp/run-v288-apply.sh')
+          PY2
+          bash /tmp/run-v288-restore.sh
+          bash /tmp/run-v288-apply.sh
+
+      - name: Apply 0.28.9 mandatory night handoff and voice clock fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/v288-to-v289.patch.gz.b64 <<'EOF'
+          H4sICIj+eGoAA3YyODgtdG8tdjI4OS5wYXRjaAC9WltvG8cVfq5+xXgfAhIklxddKMmWY0WiZaIS
+          pYqUgyAIiNXukJxoucvsLiWrjoHIbpoWTmPk8tQ26OWhL0UB2bFrR5YVIL9g+RfyS3rO7IV7IyUx
+          SglbonZmzjlzzncuc2YV1mqRnNGvEaZp1Mh/1GfUyilMMg7zUq+X3+0zVRHbhqSoVNyzTNLVlcSB
+          8xhOYoRbs7KnDvBpGBRyahbuFVea2HNJ1PooSTNqKzoSCz7EbYIMB1JmaZrAnu/B9qZimxZkGc5o0N5p
+          EAIy1ZYAAWAFg2nKaqySkUQCWwcTgf2wFKvYjOKYUOOEKo6j+GvU9JhwGMWO4MmwcYggT1Xjz6fD
+          xaUYpYKW1/qo7hxVQlnxiOkve62nZJ5Y2YCrxBlYNuJBxLRI1gGFBw2LKdVUOwTdMjVP2lNuCoAE
+          g4TBqYX1jtYyaLIb27fScL0Pp3sP/bX0y+yfnUNJsOysA+MqyBImwxGmI+uHr26PkxktFZ71Juq8
+          0UFGBwALuiwKjPvKd3O7US0LOFAIfDEiNrJcIxOSd8x2wpGDWWXjbw5G2fB2LLjXFM36DjZ3gZhH
+          mWM76Dhn1FVLlJx0pKYh7lbRCaAcRPyoqTmDI4Jv9XG0w9I+qp3dBqIs7bECp7J4dqyRv2I/K7D
+          0pc4grgKLJDmwvMfXXl1M7G5ULkzlr6HlZCBrLWh2kM3ZmHLrOO3j4D4cbVb97Uu7b1aUpgXDRX8
+          1o6/ykugglICFtPHz1dWtpYAiijh8x8XonV57M/fcl33Z0+vH/caMmf33ZvXc8/GNU7t59tPPb5z
+          5/ztM3efn9l88/S9J+f8zvbzo2euv3vsl57YfHf9xTcvPn36UGT5+PD1xP/79dHPzyRlm0ePPjn1
+          uE+fPvvm8fPXv/j3xV+/e/Tjm8+eP/k0tjy1f/THv7y+/vjxL4+ePnj8wJNPfvD0kzefPH/26L8f
+          ffvB/3n8T5+9e/RZzb5+9PKqbfB9OLm+gl2eoX84IbUAE7TmL5Zgk4yK0r3GJdIuF7Ho9W6p4xx
+          rOM80cU7XRxWjLJ7xwgzH88x/pvqFsOFLdkM/rJCbOuStouK0qBaZx5B+hWR8I8BO3PexKgQmbr
+          lq2Tlg2qbqU8P2i6Q2mQTo16JOiW/g2eqQlSFlsyWeazB91WpwNgvNxhv+d0cT3g7vKsH2Y8Qx
+          mG6GNsrER4bNWQvf4PiNczTmYxj7PUNLjvyB5ZP8N2YdpnaA6KcL5YLGk7x0y0ZCddgArFvzRB
+          WHW1NpVbSuvIB3xbynkL+iwQKxRN2R4aPMM4QnefofMGJYliOVg29S/m+4V7n5u+NkekEc4Ido
+          7GTTmDF1k2EHg8YFvCPEP2AahEGhIsC+ZMVsdcmmdvTOM0tE1qmzt/hP6/9dJXSIuQAAAA==
+          EOF
+          base64 -d /tmp/v288-to-v289.patch.gz.b64 > /tmp/v288-to-v289.patch.gz
+          gzip -dc /tmp/v288-to-v289.patch.gz > /tmp/v288-to-v289.patch
+          cd buildsrc/quiet-diary
+          patch -p3 < /tmp/v288-to-v289.patch
+
+          grep -q 'versionCode = 289' app/build.gradle.kts
+          grep -q 'versionName = "0.28.9"' app/build.gradle.kts
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'return body + " → ночной режим"' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -q 'if (!autoNight)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -R -q 'nightCaptureSwitch' app/src/main
+          grep -q 'WakeTemplateStore.timeCount(this) < WakeTemplateStore.REQUIRED_TIME_SAMPLES' app/src/main/java/com/quietdiary/app/NightProgramActivity.java
+
+          python3 - <<'PY2'
+          from pathlib import Path
+          s = Path('app/src/main/java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          area = s[s.index('if (timeDetector != null)'):s.index('boolean matched = wakeDetector.accept')]
+          assert 'startTimeTextVerification(timeCandidate)' in area
+          assert 'candidateLooksLikeTime(this, timeCandidate)' not in area
+          assert 'answerCurrentTimeByVoice' in s
+          assert 'restartAudioInput();' in s[s.index('private void answerCurrentTimeByVoice'):s.index('private void pauseAudioInputForSpeech')]
+          print('Night handoff + voice clock guards: OK')
+          PY2
+
+          python3 - <<'PY2'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for p in Path('app/src/main/res').rglob('*.xml'):
+              ET.parse(p)
+          print('XML validation: OK')
+          PY2
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.9-night-clock-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.9-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.9-night-clock-debug-apk
+          path: Nightseed-0.28.9-night-clock-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.9-restored-source
+          path: Nightseed-0.28.9-restored-source.zip
+          retention-days: 14
