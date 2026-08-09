@@ -1,0 +1,110 @@
+name: Build Nightseed 0.28.8 practice fix
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.6 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          lines = Path('.github/workflows/android-v286-buttons.yml').read_text(encoding='utf-8').splitlines()
+
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
+              Path(output).write_text(script, encoding='utf-8')
+
+          extract('Restore Nightseed 0.28.5 project', '/tmp/run-v286-restore.sh')
+          extract('Make all button labels adaptive', '/tmp/run-v286-buttons.sh')
+          PY
+          bash /tmp/run-v286-restore.sh
+          bash /tmp/run-v286-buttons.sh
+
+      - name: Apply 0.28.8 practice fixes and visual rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/v286-to-v288.patch.gz.b64 <<'EOF'
+          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
+          EOF
+          base64 -d /tmp/v286-to-v288.patch.gz.b64 | gzip -d > /tmp/v286-to-v288.patch
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v286-to-v288.patch
+
+          # Version and visual rollback guards: 0.28.8 must keep the 0.28.6 look.
+          grep -q 'versionCode = 288' app/build.gradle.kts
+          grep -q 'versionName = "0.28.8"' app/build.gradle.kts
+          grep -q '<color name="qd_primary">#83E2C1</color>' app/src/main/res/values/colors.xml
+          grep -q '<color name="qd_practice">#8ED8EA</color>' app/src/main/res/values/colors.xml
+          ! grep -q 'Widget.QuietDiary.Button' app/src/main/res/values/themes.xml
+
+          # Practice-flow regression guards.
+          grep -q 'EXTRA_CONFIG_ONLY' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+          grep -q 'self_suggestion_auto_night' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+          grep -q 'suggestionAutoNightSwitch' app/src/main/res/layout/activity_self_suggestion.xml
+          ! grep -q 'putBoolean(CouePracticeActivity.KEY_AUTO_NIGHT, false)' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+          ! grep -q 'nightStartNowButton).setEnabled(false)' app/src/main/java/com/quietdiary/app/NightProgramActivity.java
+          ! grep -q 'nightStartDelayButton).setEnabled(false)' app/src/main/java/com/quietdiary/app/NightProgramActivity.java
+          grep -q 'verifyNightCaptureStarted' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'verifyNightCaptureStarted' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          ! grep -R -q 'CouePracticeActivity.class' app/src/main/java/com/quietdiary/app --exclude=CouePracticeActivity.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for path in Path('app/src/main/res').rglob('*.xml'):
+              ET.parse(path)
+          print('0.28.8 XML + practice regression guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.8-practice-fix-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.8-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.8-practice-fix-debug-apk
+          path: Nightseed-0.28.8-practice-fix-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.8-restored-source
+          path: Nightseed-0.28.8-restored-source.zip
+          retention-days: 14
