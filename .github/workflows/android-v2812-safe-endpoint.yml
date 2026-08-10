@@ -84,10 +84,10 @@ jobs:
           ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/CouePracticeService.java
           grep -q 'GoogleSpeechTranscriber.transcribeSamples(candidate' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'GoogleSpeechTranscriber.transcribeSamples(candidate' app/src/main/java/com/quietdiary/app/CouePracticeService.java
-          grep -q 'suggestionProgressText' app/src/main/res/layout/activity_self_suggestion.xml
-          grep -q 'coueStartPhraseInput' app/src/main/res/layout/activity_self_suggestion.xml
-          grep -q 'coueStartTrainButton' app/src/main/res/layout/activity_self_suggestion.xml
-          grep -q 'coueVoiceWaitButton' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionProgressCounter' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionVoiceStartPhraseInput' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionTrainVoiceStartButton' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionVoiceStartButton' app/src/main/res/layout/activity_self_suggestion.xml
           grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
           grep -q 'startTimeTextVerification(timeCandidate)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           python3 - <<'PY'
