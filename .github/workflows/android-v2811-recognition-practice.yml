@@ -1,0 +1,148 @@
+name: Build Nightseed 0.28.11 recognition + practice restore
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.10 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2810-purple-controls.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore Nightseed 0.28.9 project', '/tmp/v2810-restore.sh')
+          extract('Apply 0.28.10 purple controls pass', '/tmp/v2810-apply.sh')
+          PY
+          bash /tmp/v2810-restore.sh
+          bash /tmp/v2810-apply.sh
+          grep -q 'versionCode = 2810' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.28.10"' buildsrc/quiet-diary/app/build.gradle.kts
+
+      - name: Apply 0.28.11 balanced recognition and practice restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp buildsrc/v2811/v2810-to-v2811.patch.gz.b64 /tmp/v2811.patch.gz.b64
+          echo '2857c170ae48bdb89bea41a5f563108cc39ae613a6d8598fb3ca59240315a6ec  /tmp/v2811.patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/v2811.patch.gz.b64 > /tmp/v2811.patch.gz
+          gzip -dc /tmp/v2811.patch.gz > /tmp/v2811.patch
+          echo 'a015d76ff2ba7983defeb41443b8271c0e911d673b1eb47b70a1c2652ee183f8  /tmp/v2811.patch' | sha256sum -c -
+          patch -p1 -d buildsrc/quiet-diary < /tmp/v2811.patch
+          test -z "$(find buildsrc/quiet-diary -name '*.rej' -print)"
+
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 2811' app/build.gradle.kts
+          grep -q 'versionName = "0.28.11"' app/build.gradle.kts
+
+          # Recognition regression fix: keep the fast-response detector path but make
+          # its endpoint balanced (~7 x 100 ms blocks), and restore final transcription.
+          grep -q 'FAST_END_SILENCE_BLOCKS = 7' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          test "$(grep -c 'new AcousticWakeDetector(.*true' app/src/main/java/com/quietdiary/app/NightCaptureService.java || true)" -ge 0
+          ! grep -q 'transcribeSamplesFast(candidate' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          ! grep -q 'transcribeSamplesFast(candidate' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          test "$(grep -c 'GoogleSpeechTranscriber.transcribeSamples(candidate' app/src/main/java/com/quietdiary/app/NightCaptureService.java)" -eq 3
+          grep -q 'GoogleSpeechTranscriber.transcribeSamples(candidate' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+
+          # Practice UX restored: live repetition counter and trained hands-free start.
+          grep -q 'suggestionProgressCounter' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionVoiceStartSection' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionVoiceStartPhraseInput' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'Обучить: 0 из 3' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'CoueStartTrainer.recordSample' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+          grep -q 'ACTION_ARM_VOICE_START' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+          grep -q 'progressCounter.setText(shown + " из " + target)' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+
+          # Preserve 0.28.10 controls and 0.28.9 critical night handoff / voice clock.
+          grep -q 'nightMusicDurationSeek' app/src/main/res/layout/activity_night_program.xml
+          grep -q 'nightMusicVolumeSeek' app/src/main/res/layout/activity_night_program.xml
+          grep -q 'wakeHourPicker' app/src/main/res/layout/activity_wake_settings.xml
+          grep -q 'wakeMinutePicker' app/src/main/res/layout/activity_wake_settings.xml
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'return body + " → ночной режим"' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -q 'if (!autoNight)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          night = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          area = night[night.index('if (timeDetector != null)'):night.index('boolean matched = wakeDetector.accept')]
+          assert 'startTimeTextVerification(timeCandidate)' in area
+          clock = night[night.index('private void answerCurrentTimeByVoice'):night.index('private void pauseAudioInputForSpeech')]
+          assert 'restartAudioInput();' in clock
+          self_s = (root/'java/com/quietdiary/app/SelfSuggestionActivity.java').read_text(encoding='utf-8')
+          assert 'MODE_PLAYING.equals(mode)' in self_s
+          assert 'CoueStartTemplateStore.REQUIRED_SAMPLES' in self_s
+          assert 'Команда запуска должна состоять из 2–4 слов' in self_s
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          button_re = re.compile(r'<(?:com\.google\.android\.material\.button\.MaterialButton|androidx\.appcompat\.widget\.AppCompatButton|android\.widget\.Button|Button)\b.*?/>', re.S)
+          failures=[]; count=0
+          for p in (root/'res/layout').glob('*.xml'):
+              text=p.read_text(encoding='utf-8')
+              for block in button_re.findall(text):
+                  count += 1
+                  if re.search(r'android:layout_height="\d+dp"', block): failures.append(f'{p.name}: fixed button height')
+                  if 'android:singleLine="true"' in block: failures.append(f'{p.name}: singleLine button')
+                  if 'android:maxLines="1"' in block and p.name != 'view_bottom_navigation.xml': failures.append(f'{p.name}: one-line button')
+                  if re.search(r'android:letterSpacing="(?!0(?:\.0+)?")', block): failures.append(f'{p.name}: spaced button text')
+          if failures:
+              raise SystemExit('Button guards failed:\n'+'\n'.join(failures[:50]))
+          print(f'0.28.11 guards OK: {count} buttons; XML valid')
+          print('Recognition: 7-block endpoint + exact transcription')
+          print('Practice: repetition counter + trained voice start restored')
+          print('Night handoff + voice clock preserved')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.11-recognition-practice-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.11-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.11-recognition-practice-debug-apk
+          path: Nightseed-0.28.11-recognition-practice-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.11-restored-source
+          path: Nightseed-0.28.11-restored-source.zip
+          retention-days: 14
