@@ -44,7 +44,40 @@ jobs:
           base64 -d /tmp/v2810.patch.gz.b64 > /tmp/v2810.patch.gz
           gzip -dc /tmp/v2810.patch.gz > /tmp/v2810.patch
           cd buildsrc/quiet-diary
+          set +e
           patch -p2 < /tmp/v2810.patch
+          patch_status=$?
+          set -e
+
+          # The 0.28.9 restore sets its version deterministically, so only this known
+          # build.gradle version hunk may reject. Any other reject is a real error.
+          unexpected_rejects="$(find . -name '*.rej' ! -path './build.gradle.kts.rej' -print)"
+          if [ -n "$unexpected_rejects" ]; then
+            echo "Unexpected patch rejects:"
+            echo "$unexpected_rejects"
+            while IFS= read -r reject; do [ -n "$reject" ] && { echo "--- $reject"; cat "$reject"; }; done <<< "$unexpected_rejects"
+            exit 1
+          fi
+          if [ "$patch_status" -ne 0 ] && [ ! -f build.gradle.kts.rej ]; then
+            echo "0.28.10 patch failed without the expected build.gradle version reject"
+            exit 1
+          fi
+
+          python3 - <<'PYVER'
+          from pathlib import Path
+          import re
+          p = Path('app/build.gradle.kts')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 2810', s, count=1)
+          s = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.10"', s, count=1)
+          p.write_text(s, encoding='utf-8')
+          PYVER
+          rm -f build.gradle.kts.rej
+          if find . -name '*.rej' -print -quit | grep -q .; then
+            echo "Patch reject remains after deterministic version repair"
+            find . -name '*.rej' -print
+            exit 1
+          fi
 
           # Version and palette.
           grep -q 'versionCode = 2810' app/build.gradle.kts
