@@ -1,0 +1,77 @@
+name: Nightseed recognition regression audit
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore 0.25 and compare with 0.25.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p buildsrc/audit
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v25.yml').read_text(encoding='utf-8').splitlines()
+          marker = '      - name: Restore Nightseed 0.25 project'
+          start = lines.index(marker)
+          run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+          end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - name: Upload restore log'))
+          Path('/tmp/restore-v25.sh').write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          PY
+          bash /tmp/restore-v25.sh
+          cp -a buildsrc/quiet-diary buildsrc/audit/v25
+          cp -a buildsrc/quiet-diary buildsrc/audit/v251
+
+          cat source-v251/chunk*.b64 > buildsrc/audit/v25-to-v251.patch.gz.b64
+          test "$(wc -c < buildsrc/audit/v25-to-v251.patch.gz.b64)" -eq 18240
+          echo 'ca76988a79e9c7025eda91f38140fe77a0c03c6882195889971fa7a9891badc1  buildsrc/audit/v25-to-v251.patch.gz.b64' | sha256sum -c -
+          base64 --decode buildsrc/audit/v25-to-v251.patch.gz.b64 | gunzip > buildsrc/audit/v25-to-v251.patch
+          patch -p1 -d buildsrc/audit/v251 < buildsrc/audit/v25-to-v251.patch
+
+          {
+            echo '=== Recognition files touched by 0.25 -> 0.25.1 ==='
+            grep '^diff --git ' buildsrc/audit/v25-to-v251.patch | grep -E 'NightCaptureService|AcousticWakeDetector|GoogleSpeechTranscriber|WakeTemplateStore|WakePhraseTextMatcher|LiveCommandRecognizer|WakeWordTrainer' || true
+            echo
+            echo '=== Relevant patch hunks ==='
+            grep -n -C 12 -E 'fastResponse|FAST_END_SILENCE_BLOCKS|SAFE_END_SILENCE_BLOCKS|transcribeSamplesFast|new AcousticWakeDetector|endSilenceBlocks|candidateLooksLikeTime|candidateLooksLikeStop|durationRatio|minimumPhraseSamples' buildsrc/audit/v25-to-v251.patch || true
+            echo
+            echo '=== v0.25 detector construction ==='
+            grep -n -C 2 'new AcousticWakeDetector' buildsrc/audit/v25/app/src/main/java/com/quietdiary/app/NightCaptureService.java || true
+            echo
+            echo '=== v0.25.1 detector construction ==='
+            grep -n -C 2 'new AcousticWakeDetector' buildsrc/audit/v251/app/src/main/java/com/quietdiary/app/NightCaptureService.java || true
+            echo
+            echo '=== v0.25 AcousticWakeDetector silence constants ==='
+            grep -n -E 'SAFE_END_SILENCE_BLOCKS|FAST_END_SILENCE_BLOCKS|endSilenceBlocks' buildsrc/audit/v25/app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java || true
+            echo
+            echo '=== v0.25.1 AcousticWakeDetector silence constants ==='
+            grep -n -E 'SAFE_END_SILENCE_BLOCKS|FAST_END_SILENCE_BLOCKS|endSilenceBlocks' buildsrc/audit/v251/app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java || true
+            echo
+            echo '=== Exact recognition-source diff ==='
+            for f in NightCaptureService.java AcousticWakeDetector.java GoogleSpeechTranscriber.kt WakeTemplateStore.java WakePhraseTextMatcher.java WakeWordTrainer.java; do
+              a="buildsrc/audit/v25/app/src/main/java/com/quietdiary/app/$f"
+              b="buildsrc/audit/v251/app/src/main/java/com/quietdiary/app/$f"
+              if [ -f "$a" ] && [ -f "$b" ]; then
+                echo "--- $f"
+                diff -u "$a" "$b" || true
+              fi
+            done
+          } | tee buildsrc/audit/recognition-regression.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-recognition-regression-audit
+          path: buildsrc/audit/recognition-regression.txt
+          retention-days: 7
