@@ -1,0 +1,139 @@
+name: Build Nightseed 0.28.10 purple UI controls
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.9 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY2'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v289-night-clock-final.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore Nightseed 0.28.8 project', '/tmp/run-v289-restore.sh')
+          extract('Apply 0.28.9 logic with deterministic version bump', '/tmp/run-v289-apply.sh')
+          PY2
+          bash /tmp/run-v289-restore.sh
+          bash /tmp/run-v289-apply.sh
+
+      - name: Apply 0.28.10 purple controls pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat buildsrc/v2810/patch_*.b64 > /tmp/v2810.patch.gz.b64
+          echo '2f8395c9a45a6afe775d08d2bbf0484f2ceb934ca4a506c872da3cddffa3a49d  /tmp/v2810.patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/v2810.patch.gz.b64 > /tmp/v2810.patch.gz
+          gzip -dc /tmp/v2810.patch.gz > /tmp/v2810.patch
+          cd buildsrc/quiet-diary
+          patch -p2 < /tmp/v2810.patch
+
+          # Version and palette.
+          grep -q 'versionCode = 2810' app/build.gradle.kts
+          grep -q 'versionName = "0.28.10"' app/build.gradle.kts
+          grep -q '<color name="qd_primary">#A58AF3</color>' app/src/main/res/values/colors.xml
+          ! grep -R -E -q '#83E2C1|#36B497|#31A98D' app/src/main/res
+
+          # Night program: real sliders, duration starts at 1 minute, old +/- controls gone.
+          grep -q 'nightMusicDurationSeek' app/src/main/res/layout/activity_night_program.xml
+          grep -q 'nightMusicVolumeSeek' app/src/main/res/layout/activity_night_program.xml
+          ! grep -R -q 'nightMusicMinusButton\|nightMusicPlusButton\|nightVolumeMinusButton\|nightVolumePlusButton' app/src/main
+          grep -q 'Math.max(1, Math.min(60' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          # Self-suggestion: slider + presets, no +/- controls.
+          grep -q 'suggestionRepetitionsSeek' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q '15 + progress \* 5' app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java
+          ! grep -R -q 'suggestionRepMinus\|suggestionRepPlus' app/src/main
+
+          # Alarm: digital hour/minute pickers, no dial and no +/- cluster.
+          grep -q 'wakeHourPicker' app/src/main/res/layout/activity_wake_settings.xml
+          grep -q 'wakeMinutePicker' app/src/main/res/layout/activity_wake_settings.xml
+          ! grep -R -q 'wakeMinus15Button\|wakeMinus5Button\|wakePlus5Button\|wakePlus15Button\|wakeTimeValue' app/src/main
+          grep -q 'hourPicker.setMinValue(0); hourPicker.setMaxValue(23)' app/src/main/java/com/quietdiary/app/WakeSettingsActivity.java
+
+          # Bottom navigation labels must not be clipped by MaterialButton insets.
+          test "$(grep -c 'android:insetTop="0dp" android:insetBottom="0dp"' app/src/main/res/layout/view_bottom_navigation.xml)" -eq 4
+
+          # Preserve 0.28.9 critical mechanics: mandatory night handoff + voice clock return-to-listening.
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'return body + " → ночной режим"' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -q 'if (!autoNight)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          python3 - <<'PY2'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          s = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          area = s[s.index('if (timeDetector != null)'):s.index('boolean matched = wakeDetector.accept')]
+          assert 'startTimeTextVerification(timeCandidate)' in area
+          clock = s[s.index('private void answerCurrentTimeByVoice'):s.index('private void pauseAudioInputForSpeech')]
+          assert 'restartAudioInput();' in clock
+
+          # Full button audit: adaptive labels, no fixed-height button regressions, no letter spacing.
+          button_re = re.compile(r'<(?:com\.google\.android\.material\.button\.MaterialButton|androidx\.appcompat\.widget\.AppCompatButton|android\.widget\.Button|Button)\b.*?/>', re.S)
+          count = 0
+          failures = []
+          for p in (root/'res/layout').glob('*.xml'):
+              text = p.read_text(encoding='utf-8')
+              for block in button_re.findall(text):
+                  count += 1
+                  if re.search(r'android:layout_height="\d+dp"', block): failures.append(f'{p.name}: fixed button height')
+                  if 'android:singleLine="true"' in block or 'android:maxLines="1"' in block and p.name != 'view_bottom_navigation.xml': failures.append(f'{p.name}: one-line button')
+                  if re.search(r'android:letterSpacing="(?!0(?:\.0+)?")', block): failures.append(f'{p.name}: spaced button text')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          if failures:
+              raise SystemExit('UI guards failed:\n' + '\n'.join(failures[:50]))
+          print(f'0.28.10 UI audit: {count} buttons checked; XML valid; controls OK')
+          print('Night handoff + voice clock regression guards: OK')
+          PY2
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.10-purple-controls-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.10-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.10-purple-controls-debug-apk
+          path: Nightseed-0.28.10-purple-controls-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.10-restored-source
+          path: Nightseed-0.28.10-restored-source.zip
+          retention-days: 14
