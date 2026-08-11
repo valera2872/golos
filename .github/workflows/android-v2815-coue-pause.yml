@@ -1,0 +1,136 @@
+name: Build Nightseed 0.28.15 shorter self-suggestion pause
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.14 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2814-dream-command.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.13 project', '/tmp/run-v2814-restore.sh')
+          extract('Apply 0.28.14 independent dream command', '/tmp/run-v2814-apply.sh')
+          PY
+          bash /tmp/run-v2814-restore.sh
+          bash /tmp/run-v2814-apply.sh
+
+      - name: Apply 0.28.15 self-suggestion pause adjustment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          changes = [
+              ('app/src/main/java/com/quietdiary/app/CouePracticeService.java',
+               'private static final long PAUSE_MS = 5000L;',
+               'private static final long PAUSE_MS = 3000L;'),
+              ('app/src/main/java/com/quietdiary/app/NightProgramService.java',
+               'private static final long COUE_PAUSE_MS = 5000L;',
+               'private static final long COUE_PAUSE_MS = 3000L;'),
+          ]
+          for path, old, new in changes:
+              p = Path(path)
+              s = p.read_text(encoding='utf-8')
+              if old not in s:
+                  raise SystemExit(f'Expected pause constant not found in {path}')
+              p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+          p = Path('app/build.gradle.kts')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 2815', s, count=1)
+          s = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.15"', s, count=1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          # Pause changed in both standalone self-suggestion and the same block inside Night Program.
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -q 'private static final long PAUSE_MS = 5000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          ! grep -q 'private static final long COUE_PAUSE_MS = 5000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          # Preserve the stable 0.28.14 night recognition baseline unchanged.
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'NightCommandRouter.Kind.DREAM' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'NightCommandRouter.Kind.ENTRY' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'suggestionProgressCounter' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'versionCode = 2815' app/build.gradle.kts
+          grep -q 'versionName = "0.28.15"' app/build.gradle.kts
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          svc = (root/'java/com/quietdiary/app/CouePracticeService.java').read_text(encoding='utf-8')
+          prog = (root/'java/com/quietdiary/app/NightProgramService.java').read_text(encoding='utf-8')
+          assert 'handler.postDelayed(() -> playNext(voice), PAUSE_MS);' in svc
+          assert 'handler.postDelayed(this::playNextFormula, COUE_PAUSE_MS);' in prog
+          night = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          assert 'startDreamTextVerification(dreamCandidate);' in night
+          assert 'beginEntry();' in night
+          clock = night[night.index('private void answerCurrentTimeByVoice'):night.index('private void pauseAudioInputForSpeech')]
+          assert 'restartAudioInput();' in clock
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          print('0.28.15 guards: self-suggestion silence = 3 seconds in both flows')
+          print('0.28.14 four-command recognition baseline preserved at safe 11-block endpoint')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.15-coue-pause-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.15-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.15-coue-pause-debug-apk
+          path: Nightseed-0.28.15-coue-pause-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.15-restored-source
+          path: Nightseed-0.28.15-restored-source.zip
+          retention-days: 14
