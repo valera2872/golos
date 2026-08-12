@@ -1,0 +1,122 @@
+name: Build Somnori 0.29.0 rebrand + capture UX
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.16 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2816-manual-record-sounds.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.15 project', '/tmp/run-v2816-restore.sh')
+          extract('Apply 0.28.16 manual capture and sound library', '/tmp/run-v2816-apply.sh')
+          PY
+          bash /tmp/run-v2816-restore.sh
+          bash /tmp/run-v2816-apply.sh
+
+      - name: Apply Somnori 0.29.0 rebrand and capture UX
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'eb0cbda0a228b085918a56ac8a42cb539b409d8de39813d8a637354d63ff03f8  buildsrc/v290/patch.gz.b64' | sha256sum -c -
+          base64 -d buildsrc/v290/patch.gz.b64 | gzip -dc > /tmp/v290.patch
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v290.patch
+
+          grep -q 'versionCode = 2900' app/build.gradle.kts
+          grep -q 'versionName = "0.29.0"' app/build.gradle.kts
+          grep -q 'android:label="Somnori"' app/src/main/AndroidManifest.xml
+          grep -q 'android:text="SOMNORI"' app/src/main/res/layout/activity_main.xml
+          grep -q 'quickRecordThoughtButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'quickRecordDreamButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'ManualRecordActivity.EXTRA_DREAM, false' app/src/main/java/com/quietdiary/app/MainActivity.java
+          grep -q 'ManualRecordActivity.EXTRA_DREAM, true' app/src/main/java/com/quietdiary/app/MainActivity.java
+
+          # User can choose and train a custom dream command.
+          grep -q 'dreamPhraseInput' app/src/main/res/layout/activity_settings.xml
+          grep -q 'dream_wake_phrase' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'trained_dream_label' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'savedDreamLabel' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'customDreamPhraseRoutesToDream' app/src/test/java/com/quietdiary/app/NightCommandRouterTest.java
+
+          # Recognition reliability baseline stays intact except the intentional dream-label preference read.
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'NightCommandRouter.Kind.DREAM' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          main=(root/'res/layout/activity_main.xml').read_text(encoding='utf-8')
+          assert 'Сны и мысли — пока они рядом' in main
+          assert 'Записать мысль' in main and 'Записать сон' in main
+          settings=(root/'res/layout/activity_settings.xml').read_text(encoding='utf-8')
+          assert 'Фраза для записи сна' in settings
+          # No new fixed-height filled buttons or letter spacing regressions in the changed main/settings layouts.
+          for name in ('activity_main.xml','activity_settings.xml'):
+              text=(root/'res/layout'/name).read_text(encoding='utf-8')
+              blocks=re.findall(r'<com\.google\.android\.material\.button\.MaterialButton\b.*?/>', text, re.S)
+              for block in blocks:
+                  assert not re.search(r'android:layout_height="\d+dp"', block), (name, 'fixed height')
+          print('Somnori 0.29.0 guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Somnori-0.29.0-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.29.0-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.0-debug-apk
+          path: Somnori-0.29.0-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.0-restored-source
+          path: Somnori-0.29.0-restored-source.zip
+          retention-days: 14
