@@ -1,0 +1,137 @@
+name: Build Nightseed 0.28.12 safe command endpoint
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.11 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2811-recognition-practice.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.10 project', '/tmp/run-v2811-restore.sh')
+          extract('Apply 0.28.11 balanced recognition and practice restore', '/tmp/run-v2811-apply.sh')
+          PY
+          bash /tmp/run-v2811-restore.sh
+          bash /tmp/run-v2811-apply.sh
+
+      - name: Apply 0.28.12 conservative endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          night = Path('app/src/main/java/com/quietdiary/app/NightCaptureService.java')
+          s = night.read_text(encoding='utf-8')
+          old = s
+          s = s.replace('new AcousticWakeDetector(wakeTemplates, wakeStoredThreshold, true)',
+                        'new AcousticWakeDetector(wakeTemplates, wakeStoredThreshold, false)')
+          s = s.replace('new AcousticWakeDetector(timeTemplates, timeStoredThreshold, true)',
+                        'new AcousticWakeDetector(timeTemplates, timeStoredThreshold, false)')
+          s = s.replace('new AcousticWakeDetector(stopTemplates, stopStoredThreshold, true)',
+                        'new AcousticWakeDetector(stopTemplates, stopStoredThreshold, false)')
+          if s == old:
+              raise SystemExit('NightCaptureService safe endpoint replacements did not apply')
+          night.write_text(s, encoding='utf-8')
+
+          coue = Path('app/src/main/java/com/quietdiary/app/CouePracticeService.java')
+          s = coue.read_text(encoding='utf-8')
+          old = s
+          s = s.replace('templates, CoueStartTemplateStore.threshold(this), true);',
+                        'templates, CoueStartTemplateStore.threshold(this), false);')
+          if s == old:
+              raise SystemExit('CouePracticeService safe endpoint replacement did not apply')
+          coue.write_text(s, encoding='utf-8')
+
+          gradle = Path('app/build.gradle.kts')
+          g = gradle.read_text(encoding='utf-8')
+          g = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 2812', g, count=1)
+          g = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.12"', g, count=1)
+          gradle.write_text(g, encoding='utf-8')
+          PY
+
+          grep -q 'versionCode = 2812' app/build.gradle.kts
+          grep -q 'versionName = "0.28.12"' app/build.gradle.kts
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          grep -q 'wakeDetector = new AcousticWakeDetector(wakeTemplates, wakeStoredThreshold, false)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'timeDetector = new AcousticWakeDetector(timeTemplates, timeStoredThreshold, false)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'stopDetector = new AcousticWakeDetector(stopTemplates, stopStoredThreshold, false)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'templates, CoueStartTemplateStore.threshold(this), false);' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'GoogleSpeechTranscriber.transcribeSamples(candidate' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'GoogleSpeechTranscriber.transcribeSamples(candidate' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'suggestionProgressCounter' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionVoiceStartPhraseInput' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionTrainVoiceStartButton' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'suggestionVoiceStartButton' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'startTimeTextVerification(timeCandidate)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          clock = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          method = clock[clock.index('private void answerCurrentTimeByVoice'):clock.index('private void pauseAudioInputForSpeech')]
+          assert 'restartAudioInput();' in method
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          print('0.28.12 safe endpoint guards: OK')
+          print('Night handoff + clock + practice controls preserved: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.12-safe-endpoint-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.12-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.12-safe-endpoint-debug-apk
+          path: Nightseed-0.28.12-safe-endpoint-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.12-restored-source
+          path: Nightseed-0.28.12-restored-source.zip
+          retention-days: 14

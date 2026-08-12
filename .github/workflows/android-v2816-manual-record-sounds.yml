@@ -1,0 +1,143 @@
+name: Build Nightseed 0.28.16 manual recording + sound library
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.15 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2815-coue-pause.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.14 project', '/tmp/run-v2815-restore.sh')
+          extract('Apply 0.28.15 self-suggestion pause adjustment', '/tmp/run-v2815-apply.sh')
+          PY
+          bash /tmp/run-v2815-restore.sh
+          bash /tmp/run-v2815-apply.sh
+
+      - name: Freeze proven night core hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          echo '8f7f71d13464844fcd799f25ce66af530a21ec587188102c094ff8c21ee43c0b  app/src/main/java/com/quietdiary/app/NightCaptureService.java' | sha256sum -c -
+          echo '47bb7afc2548d6eb74088e64a89a574cd5b6d2b8982ee4e6361bf6920ad7b293  app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java' | sha256sum -c -
+          echo 'b65265760275f8f38df8dc77eafca8dec5f628b0262bf4f2e2c6727e6d3f3b0f  app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt' | sha256sum -c -
+          echo 'd24238055e37894b6675e1e9194f6edb6ecb172cbf6fb25b6e1be06c3bc6d39e  app/src/main/java/com/quietdiary/app/NightCommandRouter.java' | sha256sum -c -
+          echo 'c07bf5e022dd62215090ca4689d0d77dd2d0e1a7b55df5fbd1232a3c13fe83f0  app/src/main/java/com/quietdiary/app/WakeTemplateStore.java' | sha256sum -c -
+
+      - name: Apply 0.28.16 manual capture and sound library
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '318a8d503bd035914c99941fae566305d123360f291bcbc7accc7e484722761c  buildsrc/v2816/patch.b64' | sha256sum -c -
+          base64 -d buildsrc/v2816/patch.b64 | gzip -dc > /tmp/v2816.patch
+          cd buildsrc/quiet-diary
+          patch -p2 < /tmp/v2816.patch
+
+          grep -q 'versionCode = 2816' app/build.gradle.kts
+          grep -q 'versionName = "0.28.16"' app/build.gradle.kts
+
+          # Ordinary foreground recording exists for thoughts and dreams and writes to the same EntryStore.
+          test -s app/src/main/java/com/quietdiary/app/ManualRecordActivity.java
+          test -s app/src/main/res/layout/activity_manual_record.xml
+          grep -q 'ManualRecordActivity.EXTRA_DREAM, false' app/src/main/java/com/quietdiary/app/ArchiveActivity.java
+          grep -q 'ManualRecordActivity.EXTRA_DREAM, true' app/src/main/java/com/quietdiary/app/DreamHubActivity.java
+          grep -q 'new Entry(createdAt, dream ? "сон" : "мысль"' app/src/main/java/com/quietdiary/app/ManualRecordActivity.java
+          grep -q 'GoogleSpeechTranscriber.transcribe' app/src/main/java/com/quietdiary/app/ManualRecordActivity.java
+          grep -q 'manualRecordPauseButton' app/src/main/res/layout/activity_manual_record.xml
+          grep -q 'manualRecordSaveButton' app/src/main/res/layout/activity_manual_record.xml
+          grep -q '<activity android:name=".ManualRecordActivity"' app/src/main/AndroidManifest.xml
+
+          # Sound library now has Music / Nature / My sounds and can play persistent user URIs.
+          grep -q 'ПРИРОДА' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'МОИ ЗВУКИ' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'soundRainButton' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'soundOceanButton' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'soundForestButton' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'soundStreamButton' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'soundMoonlightButton' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'soundDeepSleepButton' app/src/main/res/layout/activity_sound_library.xml
+          grep -q 'customAudioPicker' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'public static final String EXTRA_URI' app/src/main/java/com/quietdiary/app/SoundscapeService.java
+          grep -q 'Math.max(1, Math.min(60' app/src/main/java/com/quietdiary/app/SoundscapeService.java
+
+          # Preserve the exact physically-tested night recognition kernel byte-for-byte.
+          echo '8f7f71d13464844fcd799f25ce66af530a21ec587188102c094ff8c21ee43c0b  app/src/main/java/com/quietdiary/app/NightCaptureService.java' | sha256sum -c -
+          echo '47bb7afc2548d6eb74088e64a89a574cd5b6d2b8982ee4e6361bf6920ad7b293  app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java' | sha256sum -c -
+          echo 'b65265760275f8f38df8dc77eafca8dec5f628b0262bf4f2e2c6727e6d3f3b0f  app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt' | sha256sum -c -
+          echo 'd24238055e37894b6675e1e9194f6edb6ecb172cbf6fb25b6e1be06c3bc6d39e  app/src/main/java/com/quietdiary/app/NightCommandRouter.java' | sha256sum -c -
+          echo 'c07bf5e022dd62215090ca4689d0d77dd2d0e1a7b55df5fbd1232a3c13fe83f0  app/src/main/java/com/quietdiary/app/WakeTemplateStore.java' | sha256sum -c -
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          # New/rewritten button layouts must remain adaptive.
+          for name in ('activity_manual_record.xml', 'activity_sound_library.xml'):
+              text=(root/'res/layout'/name).read_text(encoding='utf-8')
+              blocks=re.findall(r'<com\.google\.android\.material\.button\.MaterialButton\b.*?/>', text, re.S)
+              for block in blocks:
+                  assert not re.search(r'android:layout_height="\d+dp"', block), (name, 'fixed height')
+                  assert 'android:letterSpacing="0"' in block, (name, 'letter spacing')
+          print('0.28.16 XML / adaptive-control guards: OK')
+          print('0.28.15 night core hashes preserved byte-for-byte')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.16-manual-record-sounds-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.16-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.16-manual-record-sounds-debug-apk
+          path: Nightseed-0.28.16-manual-record-sounds-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.16-restored-source
+          path: Nightseed-0.28.16-restored-source.zip
+          retention-days: 14

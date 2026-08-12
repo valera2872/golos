@@ -1,0 +1,32 @@
+Nightseed / Somnori 0.28.16 built-in audio manifest
+
+music_sea_harp.mp3
+  source: konstantinpazuzustudio-beside-the-sea-harp-and-ocean-525286.mp3
+  UI: Море и арфа
+  duration: 183.408 s
+  bitrate: 256000 bps
+  sha256: 98fa11c74b316deb9bd72905ccb0da1efb2feb7774d5bc79f8f2c2b47d78b4f0
+
+music_calm_energy.mp3
+  source: rockot-meditation-and-gentle-nature-184572.mp3
+  UI: Мягкая природа
+  duration: 600.032625 s
+  bitrate: 256000 bps
+  sha256: 02a6e69b3d8304cea5b185e94fe1c8be44ef07e706f4fb2544342377e4fb2d41
+  note: internal resource name retained for compatibility; hidden from Music and exposed under Nature.
+
+music_quiet_meditation.mp3
+  source: blubonrelaxon-music-for-relax-yoga-meditation-7783.mp3
+  UI: Тихая медитация
+  duration: 385.227750 s
+  bitrate: 256000 bps
+  sha256: 76527a75f5dcb011418e543c27c86143532208e9695aa74344d1050fabb5ad27
+
+nature_forest.mp3
+  source: wr-sound-library-deep-forest-birds-singing-no-copyright-infinite-568105.mp3
+  UI: Ночной лес
+  duration: 600.450594 s
+  bitrate: 255999 bps
+  sha256: 1fd14070434bf2e2639d62b840a040df159cebb52b0525dc3cb602fa3ec081cc
+
+Policy for this test build: inject masters without transcoding. If APK size becomes undesirable, optimize later from these masters rather than replacing them with synthetic audio.

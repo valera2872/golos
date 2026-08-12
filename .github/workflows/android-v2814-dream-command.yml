@@ -1,0 +1,342 @@
+name: Build Nightseed 0.28.14 four routed night commands
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.13 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2813-command-routing.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.12 project', '/tmp/run-v2813-restore.sh')
+          extract('Apply 0.28.13 command arbitration fix', '/tmp/run-v2813-apply.sh')
+          PY
+          bash /tmp/run-v2813-restore.sh
+          bash /tmp/run-v2813-apply.sh
+
+      - name: Apply 0.28.14 independent dream command
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+
+          cat > app/src/main/java/com/quietdiary/app/NightCommandRouter.java <<'JAVA'
+          package com.quietdiary.app;
+
+          /** Final command arbitration after speech-to-text. Acoustic matches are gates only. */
+          public final class NightCommandRouter {
+              public enum Kind { ENTRY, DREAM, TIME, STOP, NONE }
+
+              public static final class Decision {
+                  public final Kind kind;
+                  public final String matchedAnchor;
+                  Decision(Kind kind, String matchedAnchor) {
+                      this.kind = kind == null ? Kind.NONE : kind;
+                      this.matchedAnchor = matchedAnchor == null ? "" : matchedAnchor;
+                  }
+              }
+
+              private NightCommandRouter() {}
+
+              public static Decision route(String recognized, String wakeLabel, String dreamLabel,
+                                           String timeLabel, String stopLabel,
+                                           Kind preferredAcousticGate) {
+                  WakePhraseTextMatcher.MatchResult entry = WakePhraseTextMatcher.match(wakeLabel, recognized);
+                  WakePhraseTextMatcher.MatchResult dream = WakePhraseTextMatcher.match(dreamLabel, recognized);
+                  WakePhraseTextMatcher.MatchResult time = WakePhraseTextMatcher.match(timeLabel, recognized);
+                  WakePhraseTextMatcher.MatchResult stop = WakePhraseTextMatcher.match(stopLabel, recognized);
+
+                  boolean explicitDream = DreamTools.isDreamWakePhrase(recognized);
+                  boolean fullEntry = entry.fullPhrase;
+                  boolean fullDream = dream.fullPhrase || explicitDream;
+                  boolean timeMatched = time.matched || VoiceCommandMatcher.isTimeRequest(recognized);
+                  boolean stopMatched = stop.matched || VoiceCommandMatcher.isStopNight(recognized, stopLabel);
+
+                  // Specific semantic/full-phrase evidence wins over shared anchor words like «дневник».
+                  if (fullDream) return new Decision(Kind.DREAM,
+                          dream.matchedAnchor.isEmpty() ? "дневник сон" : dream.matchedAnchor);
+                  if (fullEntry) return new Decision(Kind.ENTRY, entry.matchedAnchor);
+                  if (stopMatched && !timeMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
+                  if (timeMatched && !stopMatched) return new Decision(Kind.TIME, time.matchedAnchor);
+
+                  // Partial STT such as «дневник за» is still useful after a trained acoustic gate.
+                  boolean entryAnchor = entry.matched;
+                  boolean dreamAnchor = dream.matched;
+                  if (preferredAcousticGate == Kind.DREAM && dreamAnchor) {
+                      return new Decision(Kind.DREAM, dream.matchedAnchor);
+                  }
+                  if (preferredAcousticGate == Kind.ENTRY && entryAnchor) {
+                      return new Decision(Kind.ENTRY, entry.matchedAnchor);
+                  }
+                  if (preferredAcousticGate == Kind.TIME && timeMatched) {
+                      return new Decision(Kind.TIME, time.matchedAnchor);
+                  }
+                  if (preferredAcousticGate == Kind.STOP && stopMatched) {
+                      return new Decision(Kind.STOP, stop.matchedAnchor);
+                  }
+
+                  // If another detector stole an entry phrase, the shared «дневник» anchor routes it back.
+                  if (entryAnchor && !explicitDream) return new Decision(Kind.ENTRY, entry.matchedAnchor);
+                  if (dreamAnchor && explicitDream) return new Decision(Kind.DREAM, dream.matchedAnchor);
+                  if (timeMatched) return new Decision(Kind.TIME, time.matchedAnchor);
+                  if (stopMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
+                  return new Decision(Kind.NONE, "");
+              }
+          }
+          JAVA
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          # ----- WakeTemplateStore: separate entry and dream acoustic banks + dream threshold -----
+          p = Path('app/src/main/java/com/quietdiary/app/WakeTemplateStore.java')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('private static final String KEY_THRESHOLD = "acoustic_wake_threshold";\n',
+                        'private static final String KEY_THRESHOLD = "acoustic_wake_threshold";\n'
+                        '    private static final String KEY_DREAM_THRESHOLD = "acoustic_dream_threshold";\n')
+          s = s.replace('public static synchronized void clearDream(Context context) { deleteAll(dreamDirectory(context)); }',
+                        'public static synchronized void clearDream(Context context) {\n'
+                        '        deleteAll(dreamDirectory(context));\n'
+                        '        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()\n'
+                        '                .remove(KEY_DREAM_THRESHOLD).apply();\n'
+                        '    }')
+          marker = '''    /** Entry examples plus optional sleeping-position and dream examples. */\n    public static synchronized List<short[]> loadAllForDetection(Context context) throws IOException {\n        List<short[]> result = loadDirectory(directory(context));\n        result.addAll(loadDirectory(fastDirectory(context)));\n        result.addAll(loadDirectory(dreamDirectory(context)));\n        return result;\n    }\n'''
+          replacement = '''    /** Entry command only: regular samples plus optional bedside sample. */\n    public static synchronized List<short[]> loadEntryForDetection(Context context) throws IOException {\n        List<short[]> result = loadDirectory(directory(context));\n        result.addAll(loadDirectory(fastDirectory(context)));\n        return result;\n    }\n\n    /** Dedicated dream command samples. */\n    public static synchronized List<short[]> loadDreamForDetection(Context context) throws IOException {\n        return loadDirectory(dreamDirectory(context));\n    }\n\n    /** Compatibility helper retained for older code/tests. */\n    public static synchronized List<short[]> loadAllForDetection(Context context) throws IOException {\n        List<short[]> result = loadEntryForDetection(context);\n        result.addAll(loadDreamForDetection(context));\n        return result;\n    }\n'''
+          if marker not in s:
+              raise SystemExit('WakeTemplateStore detection marker not found')
+          s = s.replace(marker, replacement, 1)
+          marker = '''    public static synchronized double calibrateTime(Context context) throws IOException {'''
+          insert = '''    public static synchronized double calibrateDream(Context context) throws IOException {\n        List<short[]> samples = loadDreamForDetection(context);\n        double threshold = AudioFingerprint.calibratedThreshold(samples);\n        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()\n                .putFloat(KEY_DREAM_THRESHOLD, (float) threshold).apply();\n        return threshold;\n    }\n\n'''
+          if marker not in s:
+              raise SystemExit('WakeTemplateStore calibrate marker not found')
+          s = s.replace(marker, insert + marker, 1)
+          marker = '''    public static double timeThreshold(Context context) {'''
+          insert = '''    public static double dreamThreshold(Context context) {\n        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);\n        return prefs.getFloat(KEY_DREAM_THRESHOLD, 0.90f);\n    }\n\n'''
+          s = s.replace(marker, insert + marker, 1)
+          p.write_text(s, encoding='utf-8')
+
+          # ----- Trainer: dream command gets its own calibrated threshold -----
+          p = Path('app/src/main/java/com/quietdiary/app/WakeWordTrainer.java')
+          s = p.read_text(encoding='utf-8')
+          old = '''                if (kind == Kind.REGULAR && complete) threshold = WakeTemplateStore.calibrate(app);\n                else if (kind == Kind.TIME && complete) threshold = WakeTemplateStore.calibrateTime(app);'''
+          new = '''                if (kind == Kind.REGULAR && complete) threshold = WakeTemplateStore.calibrate(app);\n                else if (kind == Kind.DREAM && complete) threshold = WakeTemplateStore.calibrateDream(app);\n                else if (kind == Kind.TIME && complete) threshold = WakeTemplateStore.calibrateTime(app);'''
+          if old not in s:
+              raise SystemExit('WakeWordTrainer calibration marker not found')
+          s = s.replace(old, new, 1)
+          old = '''                else if (kind == Kind.TIME) threshold = WakeTemplateStore.timeThreshold(app);\n                else if (kind == Kind.STOP) threshold = WakeTemplateStore.stopThreshold(app);\n                else threshold = WakeTemplateStore.threshold(app);'''
+          new = '''                else if (kind == Kind.DREAM) threshold = WakeTemplateStore.dreamThreshold(app);\n                else if (kind == Kind.TIME) threshold = WakeTemplateStore.timeThreshold(app);\n                else if (kind == Kind.STOP) threshold = WakeTemplateStore.stopThreshold(app);\n                else threshold = WakeTemplateStore.threshold(app);'''
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          # ----- NightCaptureService: four independent detectors, then text arbitration -----
+          p = Path('app/src/main/java/com/quietdiary/app/NightCaptureService.java')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('private enum VerificationPurpose { ENTRY, TIME, STOP }',
+                        'private enum VerificationPurpose { ENTRY, DREAM, TIME, STOP }')
+          s = s.replace('    private AcousticWakeDetector wakeDetector;\n    private AcousticWakeDetector timeDetector;',
+                        '    private AcousticWakeDetector wakeDetector;\n    private AcousticWakeDetector dreamDetector;\n    private AcousticWakeDetector timeDetector;')
+          s = s.replace('    private List<short[]> wakeTemplates;\n    private List<short[]> timeTemplates;',
+                        '    private List<short[]> wakeTemplates;\n    private List<short[]> dreamTemplates;\n    private List<short[]> timeTemplates;')
+          s = s.replace('    private double wakeStoredThreshold;\n    private double timeStoredThreshold;',
+                        '    private double wakeStoredThreshold;\n    private double dreamStoredThreshold;\n    private double timeStoredThreshold;')
+          s = s.replace('    private String wakeLabel = "кодовая фраза";\n    private String timeLabel = "Который час";',
+                        '    private String wakeLabel = "кодовая фраза";\n    private String dreamLabel = DreamTools.DEFAULT_DREAM_WAKE_PHRASE;\n    private String timeLabel = "Который час";')
+          s = s.replace('wakeTemplates = WakeTemplateStore.loadAllForDetection(this);',
+                        'wakeTemplates = WakeTemplateStore.loadEntryForDetection(this);')
+          load_marker = '''            wakeStoredThreshold = WakeTemplateStore.threshold(this);\n            timeTemplates = WakeTemplateStore.loadTimeForDetection(this);'''
+          load_repl = '''            wakeStoredThreshold = WakeTemplateStore.threshold(this);\n            dreamTemplates = WakeTemplateStore.loadDreamForDetection(this);\n            dreamStoredThreshold = WakeTemplateStore.dreamThreshold(this);\n            timeTemplates = WakeTemplateStore.loadTimeForDetection(this);'''
+          if load_marker not in s:
+              raise SystemExit('NightCaptureService load marker not found')
+          s = s.replace(load_marker, load_repl, 1)
+
+          # Reset dream detector wherever all waiting detectors are reset.
+          s = s.replace('if (wakeDetector != null) wakeDetector.reset();\n            if (timeDetector != null) timeDetector.reset();',
+                        'if (wakeDetector != null) wakeDetector.reset();\n            if (dreamDetector != null) dreamDetector.reset();\n            if (timeDetector != null) timeDetector.reset();')
+          s = s.replace('if (wakeDetector != null) wakeDetector.reset();\n                    if (timeDetector != null) timeDetector.reset();',
+                        'if (wakeDetector != null) wakeDetector.reset();\n                    if (dreamDetector != null) dreamDetector.reset();\n                    if (timeDetector != null) timeDetector.reset();')
+          s = s.replace('if (timeDetector != null) timeDetector.reset();\n            if (stopDetector != null) stopDetector.reset();',
+                        'if (dreamDetector != null) dreamDetector.reset();\n            if (timeDetector != null) timeDetector.reset();\n            if (stopDetector != null) stopDetector.reset();')
+
+          # Dedicated dream acoustic gate after the clock gate and before normal entry gate.
+          marker = '''        boolean matched = wakeDetector.accept(buffer, count);'''
+          dream_block = '''        if (dreamDetector != null) {\n            boolean dreamMatched = dreamDetector.accept(buffer, count);\n            dreamDetector.consumeCandidateFinished();\n            if (dreamMatched) {\n                short[] dreamCandidate = dreamDetector.consumeMatchedCandidate();\n                if (dreamCandidate != null && dreamCandidate.length > 0) {\n                    wakeArmed = false;\n                    if (wakeDetector != null) wakeDetector.reset();\n                    if (timeDetector != null) timeDetector.reset();\n                    if (stopDetector != null) stopDetector.reset();\n                    DiagnosticsStore.record(this, DiagnosticsStore.ACOUSTIC_MATCH,\n                            "самостоятельная команда сна · " + dreamCandidate.length + " отсчётов",\n                            0L, MODE_WAITING);\n                    startDreamTextVerification(dreamCandidate);\n                    return;\n                }\n            }\n        }\n\n'''
+          if marker not in s:
+              raise SystemExit('NightCaptureService entry detector marker not found')
+          s = s.replace(marker, dream_block + marker, 1)
+
+          # Add the dream text verifier next to time verifier.
+          marker = '''    private void startTimeTextVerification(short[] candidate) {'''
+          dream_method = '''    private void startDreamTextVerification(short[] candidate) {\n        verificationPurpose = VerificationPurpose.DREAM;\n        wakeCandidateDreamHint = true;\n        clearWakeVerificationBuffer();\n        wakeVerificationResult.set(null);\n        final long generation = wakeVerificationGeneration.incrementAndGet();\n        wakeVerificationStartedAt = System.currentTimeMillis();\n        wakeVerificationInProgress.set(true);\n        setMode(MODE_VERIFYING);\n        vibratePattern(new long[]{0, 70});\n        updateNotification("Команда сна услышана · проверяю фразу…");\n        DiagnosticsStore.record(this, DiagnosticsStore.VERIFY_START,\n                "запись сна: " + dreamLabel, 0L, MODE_VERIFYING);\n\n        GoogleSpeechTranscriber.transcribeSamples(candidate,\n                new GoogleSpeechTranscriber.TranscriptionListener() {\n                    @Override public void onComplete(String text) {\n                        if (wakeVerificationGeneration.get() != generation || !running.get()) return;\n                        WakePhraseTextMatcher.MatchResult custom =\n                                WakePhraseTextMatcher.match(dreamLabel, text);\n                        boolean matched = custom.matched || DreamTools.isDreamWakePhrase(text);\n                        wakeVerificationResult.set(new WakeVerificationResult(\n                                matched, text, "", custom.matchedAnchor));\n                    }\n\n                    @Override public void onError(String message) {\n                        if (wakeVerificationGeneration.get() != generation || !running.get()) return;\n                        wakeVerificationResult.set(new WakeVerificationResult(false, "", message, ""));\n                    }\n                });\n    }\n\n'''
+          s = s.replace(marker, dream_method + marker, 1)
+
+          # Upgrade 0.28.13 routing from three to four commands.
+          old = '''                NightCommandRouter.Kind preferredKind = completedPurpose == VerificationPurpose.TIME\n                        ? NightCommandRouter.Kind.TIME\n                        : completedPurpose == VerificationPurpose.STOP\n                        ? NightCommandRouter.Kind.STOP\n                        : NightCommandRouter.Kind.ENTRY;\n                NightCommandRouter.Decision routed = NightCommandRouter.route(\n                        completed.recognizedText, wakeLabel, timeLabel, stopLabel, preferredKind);\n                if (routed.kind != NightCommandRouter.Kind.NONE) {\n                    VerificationPurpose routedPurpose = routed.kind == NightCommandRouter.Kind.TIME\n                            ? VerificationPurpose.TIME\n                            : routed.kind == NightCommandRouter.Kind.STOP\n                            ? VerificationPurpose.STOP\n                            : VerificationPurpose.ENTRY;'''
+          new = '''                NightCommandRouter.Kind preferredKind = completedPurpose == VerificationPurpose.TIME\n                        ? NightCommandRouter.Kind.TIME\n                        : completedPurpose == VerificationPurpose.STOP\n                        ? NightCommandRouter.Kind.STOP\n                        : completedPurpose == VerificationPurpose.DREAM\n                        ? NightCommandRouter.Kind.DREAM\n                        : NightCommandRouter.Kind.ENTRY;\n                NightCommandRouter.Decision routed = NightCommandRouter.route(\n                        completed.recognizedText, wakeLabel, dreamLabel, timeLabel, stopLabel, preferredKind);\n                if (routed.kind != NightCommandRouter.Kind.NONE) {\n                    VerificationPurpose routedPurpose = routed.kind == NightCommandRouter.Kind.TIME\n                            ? VerificationPurpose.TIME\n                            : routed.kind == NightCommandRouter.Kind.STOP\n                            ? VerificationPurpose.STOP\n                            : routed.kind == NightCommandRouter.Kind.DREAM\n                            ? VerificationPurpose.DREAM\n                            : VerificationPurpose.ENTRY;'''
+          if old not in s:
+              raise SystemExit('0.28.13 router block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                nextEntryCategory = (wakeCandidateDreamHint\n                        || DreamTools.isDreamWakePhrase(completed.recognizedText)\n                        || DreamTools.isDreamWakePhrase(wakeLabel))\n                        ? "сон" : "мысль";'''
+          new = '''                nextEntryCategory = (completedPurpose == VerificationPurpose.DREAM\n                        || wakeCandidateDreamHint\n                        || DreamTools.isDreamWakePhrase(completed.recognizedText))\n                        ? "сон" : "мысль";'''
+          if old not in s:
+              raise SystemExit('dream category block not found')
+          s = s.replace(old, new, 1)
+
+          # Reject/abort messages include dream purpose.
+          s = s.replace('completedPurpose == VerificationPurpose.STOP\n                        ? "Команда выключения не подтверждена · " + detail\n                        : "Кодовая фраза не подтверждена · " + detail',
+                        'completedPurpose == VerificationPurpose.STOP\n                        ? "Команда выключения не подтверждена · " + detail\n                        : completedPurpose == VerificationPurpose.DREAM\n                        ? "Команда сна не подтверждена · " + detail\n                        : "Кодовая фраза не подтверждена · " + detail')
+          s = s.replace('abortedPurpose == VerificationPurpose.STOP\n                ? "Проверка команды выключения сброшена · "\n                : "Проверка кодовой фразы сброшена · "',
+                        'abortedPurpose == VerificationPurpose.STOP\n                ? "Проверка команды выключения сброшена · "\n                : abortedPurpose == VerificationPurpose.DREAM\n                ? "Проверка команды сна сброшена · "\n                : "Проверка кодовой фразы сброшена · "')
+
+          # Recreate all four acoustic detectors.
+          old = '''        wakeDetector = new AcousticWakeDetector(wakeTemplates, wakeStoredThreshold, false);\n        if (timeTemplates != null && timeTemplates.size() >= WakeTemplateStore.REQUIRED_TIME_SAMPLES) {'''
+          new = '''        wakeDetector = new AcousticWakeDetector(wakeTemplates, wakeStoredThreshold, false);\n        if (dreamTemplates != null && dreamTemplates.size() >= WakeTemplateStore.REQUIRED_DREAM_SAMPLES) {\n            dreamDetector = new AcousticWakeDetector(dreamTemplates, dreamStoredThreshold, false);\n        } else {\n            dreamDetector = null;\n        }\n        if (timeTemplates != null && timeTemplates.size() >= WakeTemplateStore.REQUIRED_TIME_SAMPLES) {'''
+          if old not in s:
+              raise SystemExit('recreate detector marker not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+
+          # ----- Surface dream training unmistakably in Settings -----
+          p = Path('app/src/main/res/layout/activity_settings.xml')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('android:text="ДОПОЛНИТЕЛЬНЫЕ КОМАНДЫ"',
+                        'android:text="ЗАПИСЬ СНА И ДОПОЛНИТЕЛЬНЫЕ КОМАНДЫ"')
+          s = s.replace('android:text="Отдельная команда для записи сна"',
+                        'android:text="Команда сна «Дневник сон»"')
+          s = s.replace('android:text="Настроить команду записи сна"',
+                        'android:text="Обучить «Дневник сон» · 3 повтора"')
+          p.write_text(s, encoding='utf-8')
+
+          # Version.
+          p = Path('app/build.gradle.kts')
+          s = p.read_text(encoding='utf-8')
+          s = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 2814', s, count=1)
+          s = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.14"', s, count=1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          cat > app/src/test/java/com/quietdiary/app/NightCommandRouterTest.java <<'JAVA'
+          package com.quietdiary.app;
+
+          import static org.junit.Assert.assertEquals;
+          import org.junit.Test;
+
+          public class NightCommandRouterTest {
+              private static final String ENTRY = "Дневник запись";
+              private static final String DREAM = "Дневник сон";
+              private static final String TIME = "Который час";
+              private static final String STOP = "Ночь стоп";
+
+              private NightCommandRouter.Decision route(String text, NightCommandRouter.Kind gate) {
+                  return NightCommandRouter.route(text, ENTRY, DREAM, TIME, STOP, gate);
+              }
+
+              @Test public void timeGateCannotStealFullDiaryPhrase() {
+                  assertEquals(NightCommandRouter.Kind.ENTRY, route("дневник запись", NightCommandRouter.Kind.TIME).kind);
+              }
+              @Test public void timeGateCannotStealPartialDiaryPhrase() {
+                  assertEquals(NightCommandRouter.Kind.ENTRY, route("дневник за", NightCommandRouter.Kind.TIME).kind);
+              }
+              @Test public void entryGateCannotStealClockPhrase() {
+                  assertEquals(NightCommandRouter.Kind.TIME, route("который час", NightCommandRouter.Kind.ENTRY).kind);
+              }
+              @Test public void entryGateCannotStealDreamPhrase() {
+                  assertEquals(NightCommandRouter.Kind.DREAM, route("дневник сон", NightCommandRouter.Kind.ENTRY).kind);
+              }
+              @Test public void timeGateCannotStealDreamPhrase() {
+                  assertEquals(NightCommandRouter.Kind.DREAM, route("дневник сон", NightCommandRouter.Kind.TIME).kind);
+              }
+              @Test public void stopPhraseRoutesToStop() {
+                  assertEquals(NightCommandRouter.Kind.STOP, route("ночь стоп", NightCommandRouter.Kind.TIME).kind);
+              }
+          }
+          JAVA
+
+          grep -q 'versionCode = 2814' app/build.gradle.kts
+          grep -q 'versionName = "0.28.14"' app/build.gradle.kts
+          grep -q 'loadEntryForDetection' app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'loadDreamForDetection' app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'calibrateDream' app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'startDreamTextVerification' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'VerificationPurpose.DREAM' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'NightCommandRouter.Kind.DREAM' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'Обучить «Дневник сон» · 3 повтора' app/src/main/res/layout/activity_settings.xml
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'suggestionProgressCounter' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          s = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          assert 'beginEntry();' in s
+          assert 'currentEntryCategory = Entry.normalizeCategory(nextEntryCategory);' in s
+          assert 'startDreamTextVerification(dreamCandidate);' in s
+          assert 'dreamTemplates = WakeTemplateStore.loadDreamForDetection(this);' in s
+          clock = s[s.index('private void answerCurrentTimeByVoice'):s.index('private void pauseAudioInputForSpeech')]
+          assert 'restartAudioInput();' in clock
+          for x in (root/'res').rglob('*.xml'):
+              ET.parse(x)
+          print('0.28.14 guards: four independent night commands OK')
+          print('ENTRY/DREAM/TIME/STOP are text-routed after acoustic gates')
+          print('Dream training is surfaced and uses its own calibrated detector')
+          print('Night handoff + clock + practice UI preserved')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.14-four-commands-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.14-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.14-four-commands-debug-apk
+          path: Nightseed-0.28.14-four-commands-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.14-restored-source
+          path: Nightseed-0.28.14-restored-source.zip
+          retention-days: 14

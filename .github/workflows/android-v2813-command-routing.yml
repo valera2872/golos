@@ -1,0 +1,239 @@
+name: Build Nightseed 0.28.13 text-routed night commands
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.12 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2812-safe-endpoint.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.11 project', '/tmp/run-v2812-restore.sh')
+          extract('Apply 0.28.12 conservative endpoint', '/tmp/run-v2812-apply.sh')
+          PY
+          bash /tmp/run-v2812-restore.sh
+          bash /tmp/run-v2812-apply.sh
+
+      - name: Apply 0.28.13 command arbitration fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+
+          cat > app/src/main/java/com/quietdiary/app/NightCommandRouter.java <<'JAVA'
+          package com.quietdiary.app;
+
+          /**
+           * Final command arbitration after speech-to-text.
+           * Acoustic detectors are only wake-up gates; the recognized words decide the action.
+           */
+          public final class NightCommandRouter {
+              public enum Kind { ENTRY, TIME, STOP, NONE }
+
+              public static final class Decision {
+                  public final Kind kind;
+                  public final String matchedAnchor;
+
+                  Decision(Kind kind, String matchedAnchor) {
+                      this.kind = kind == null ? Kind.NONE : kind;
+                      this.matchedAnchor = matchedAnchor == null ? "" : matchedAnchor;
+                  }
+              }
+
+              private NightCommandRouter() {}
+
+              public static Decision route(String recognized, String wakeLabel,
+                                           String timeLabel, String stopLabel,
+                                           Kind preferredAcousticGate) {
+                  WakePhraseTextMatcher.MatchResult entry =
+                          WakePhraseTextMatcher.match(wakeLabel, recognized);
+                  WakePhraseTextMatcher.MatchResult time =
+                          WakePhraseTextMatcher.match(timeLabel, recognized);
+                  WakePhraseTextMatcher.MatchResult stop =
+                          WakePhraseTextMatcher.match(stopLabel, recognized);
+
+                  boolean entryMatched = entry.matched;
+                  boolean timeMatched = time.matched || VoiceCommandMatcher.isTimeRequest(recognized);
+                  boolean stopMatched = stop.matched
+                          || VoiceCommandMatcher.isStopNight(recognized, stopLabel);
+
+                  // If more than one textual matcher accepts the phrase, preserve the acoustic
+                  // detector only as a tie-breaker. It must never override unambiguous text.
+                  int matches = (entryMatched ? 1 : 0) + (timeMatched ? 1 : 0) + (stopMatched ? 1 : 0);
+                  if (matches > 1) {
+                      if (preferredAcousticGate == Kind.STOP && stopMatched) {
+                          return new Decision(Kind.STOP, stop.matchedAnchor);
+                      }
+                      if (preferredAcousticGate == Kind.TIME && timeMatched) {
+                          return new Decision(Kind.TIME, time.matchedAnchor);
+                      }
+                      if (preferredAcousticGate == Kind.ENTRY && entryMatched) {
+                          return new Decision(Kind.ENTRY, entry.matchedAnchor);
+                      }
+                  }
+
+                  if (stopMatched && !entryMatched && !timeMatched) {
+                      return new Decision(Kind.STOP, stop.matchedAnchor);
+                  }
+                  if (timeMatched && !entryMatched && !stopMatched) {
+                      return new Decision(Kind.TIME, time.matchedAnchor);
+                  }
+                  if (entryMatched && !timeMatched && !stopMatched) {
+                      return new Decision(Kind.ENTRY, entry.matchedAnchor);
+                  }
+
+                  // Deterministic fallback for ambiguous custom phrases.
+                  if (stopMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
+                  if (timeMatched) return new Decision(Kind.TIME, time.matchedAnchor);
+                  if (entryMatched) return new Decision(Kind.ENTRY, entry.matchedAnchor);
+                  return new Decision(Kind.NONE, "");
+              }
+          }
+          JAVA
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('app/src/main/java/com/quietdiary/app/NightCaptureService.java')
+          s = p.read_text(encoding='utf-8')
+          needle = '''            wakeVerificationInProgress.set(false);\n            wakeVerificationStartedAt = 0L;\n            if (completed.matched) {'''
+          replacement = '''            wakeVerificationInProgress.set(false);\n            wakeVerificationStartedAt = 0L;\n\n            // Acoustic detectors are deliberately permissive. A TIME detector may therefore\n            // wake up on the diary phrase (or vice versa). Once STT has produced words, route\n            // by those words instead of blindly trusting whichever acoustic detector fired first.\n            if (completed.error.isEmpty() && !completed.recognizedText.isEmpty()) {\n                NightCommandRouter.Kind preferredKind = completedPurpose == VerificationPurpose.TIME\n                        ? NightCommandRouter.Kind.TIME\n                        : completedPurpose == VerificationPurpose.STOP\n                        ? NightCommandRouter.Kind.STOP\n                        : NightCommandRouter.Kind.ENTRY;\n                NightCommandRouter.Decision routed = NightCommandRouter.route(\n                        completed.recognizedText, wakeLabel, timeLabel, stopLabel, preferredKind);\n                if (routed.kind != NightCommandRouter.Kind.NONE) {\n                    VerificationPurpose routedPurpose = routed.kind == NightCommandRouter.Kind.TIME\n                            ? VerificationPurpose.TIME\n                            : routed.kind == NightCommandRouter.Kind.STOP\n                            ? VerificationPurpose.STOP\n                            : VerificationPurpose.ENTRY;\n                    if (routedPurpose != completedPurpose) {\n                        DiagnosticsStore.record(this, DiagnosticsStore.VERIFY_OK,\n                                "маршрутизация по тексту: " + completedPurpose + " → " + routedPurpose\n                                        + " · «" + completed.recognizedText + "»",\n                                verificationLatency, MODE_VERIFYING);\n                    }\n                    completedPurpose = routedPurpose;\n                    completed = new WakeVerificationResult(true, completed.recognizedText, "",\n                            routed.matchedAnchor);\n                } else {\n                    completed = new WakeVerificationResult(false, completed.recognizedText, "", "");\n                }\n            }\n\n            if (completed.matched) {'''
+          if needle not in s:
+              raise SystemExit('NightCaptureService arbitration insertion point not found')
+          s = s.replace(needle, replacement, 1)
+          p.write_text(s, encoding='utf-8')
+
+          settings = Path('app/src/main/java/com/quietdiary/app/SettingsActivity.java')
+          t = settings.read_text(encoding='utf-8')
+          old = '''                        trainingStatus.setText("✓ Фраза подтверждена. Распознано: «"\n                                + result.recognizedText + "».");'''
+          new = '''                        trainingStatus.setText("✓ Фраза подтверждена. Распознано: «"\n                                + result.recognizedText\n                                + "». Это только проверка распознавания — запись здесь не запускается.");'''
+          if old not in t:
+              raise SystemExit('Settings test-result text insertion point not found')
+          settings.write_text(t.replace(old, new, 1), encoding='utf-8')
+
+          gradle = Path('app/build.gradle.kts')
+          g = gradle.read_text(encoding='utf-8')
+          g = re.sub(r'versionCode\s*=\s*\d+', 'versionCode = 2813', g, count=1)
+          g = re.sub(r'versionName\s*=\s*"[^"]+"', 'versionName = "0.28.13"', g, count=1)
+          gradle.write_text(g, encoding='utf-8')
+          PY
+
+          cat > app/src/test/java/com/quietdiary/app/NightCommandRouterTest.java <<'JAVA'
+          package com.quietdiary.app;
+
+          import static org.junit.Assert.assertEquals;
+
+          import org.junit.Test;
+
+          public class NightCommandRouterTest {
+              private static final String ENTRY = "Дневник запись";
+              private static final String TIME = "Который час";
+              private static final String STOP = "Ночь стоп";
+
+              @Test public void timeAcousticGateCannotStealFullDiaryPhrase() {
+                  NightCommandRouter.Decision d = NightCommandRouter.route(
+                          "дневник запись", ENTRY, TIME, STOP, NightCommandRouter.Kind.TIME);
+                  assertEquals(NightCommandRouter.Kind.ENTRY, d.kind);
+              }
+
+              @Test public void timeAcousticGateCannotStealPartialDiaryRecognition() {
+                  NightCommandRouter.Decision d = NightCommandRouter.route(
+                          "дневник за", ENTRY, TIME, STOP, NightCommandRouter.Kind.TIME);
+                  assertEquals(NightCommandRouter.Kind.ENTRY, d.kind);
+              }
+
+              @Test public void entryAcousticGateCannotStealClockPhrase() {
+                  NightCommandRouter.Decision d = NightCommandRouter.route(
+                          "который час", ENTRY, TIME, STOP, NightCommandRouter.Kind.ENTRY);
+                  assertEquals(NightCommandRouter.Kind.TIME, d.kind);
+              }
+
+              @Test public void stopPhraseRoutesToStop() {
+                  NightCommandRouter.Decision d = NightCommandRouter.route(
+                          "ночь стоп", ENTRY, TIME, STOP, NightCommandRouter.Kind.TIME);
+                  assertEquals(NightCommandRouter.Kind.STOP, d.kind);
+              }
+          }
+          JAVA
+
+          grep -q 'versionCode = 2813' app/build.gradle.kts
+          grep -q 'versionName = "0.28.13"' app/build.gradle.kts
+          grep -q 'маршрутизация по тексту' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'NightCommandRouter.route' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'Это только проверка распознавания — запись здесь не запускается' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'suggestionProgressCounter' app/src/main/res/layout/activity_self_suggestion.xml
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'startTimeTextVerification(timeCandidate)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          s = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          assert 'beginEntry();' in s
+          assert 'NightCommandRouter.route(' in s
+          clock = s[s.index('private void answerCurrentTimeByVoice'):s.index('private void pauseAudioInputForSpeech')]
+          assert 'restartAudioInput();' in clock
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          print('0.28.13 routing guards: OK')
+          print('Text decides ENTRY/TIME/STOP after any acoustic wake gate')
+          print('Night handoff + clock + practice UI preserved')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.13-command-routing-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.13-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.13-command-routing-debug-apk
+          path: Nightseed-0.28.13-command-routing-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.13-restored-source
+          path: Nightseed-0.28.13-restored-source.zip
+          retention-days: 14

@@ -1,0 +1,181 @@
+name: Build Nightseed 0.28.9 night handoff + clock
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Nightseed 0.28.8 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY2'
+          from pathlib import Path
+          import textwrap
+
+          lines = Path('.github/workflows/android-v288-practice-fix.yml').read_text(encoding='utf-8').splitlines()
+
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n'
+              Path(output).write_text(script, encoding='utf-8')
+
+          extract('Restore Nightseed 0.28.6 project', '/tmp/run-v288-restore.sh')
+          extract('Apply 0.28.8 practice fixes and visual rollback', '/tmp/run-v288-apply.sh')
+          PY2
+          bash /tmp/run-v288-restore.sh
+          bash /tmp/run-v288-apply.sh
+
+      - name: Apply 0.28.9 mandatory night handoff and voice clock fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/v288-to-v289.patch.gz.b64 <<'EOF'
+          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
+          EOF
+          base64 -d /tmp/v288-to-v289.patch.gz.b64 > /tmp/v288-to-v289.patch.gz
+          gzip -dc /tmp/v288-to-v289.patch.gz > /tmp/v288-to-v289.patch
+          cd buildsrc/quiet-diary
+          patch -p2 < /tmp/v288-to-v289.patch
+
+          # Acceptance guards: a bedtime program can no longer finish before night capture starts.
+          grep -q 'versionCode = 289' app/build.gradle.kts
+          grep -q 'versionName = "0.28.9"' app/build.gradle.kts
+          grep -q 'putBoolean(KEY_AUTO_NIGHT, true)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          grep -q 'return body + " → ночной режим"' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -q 'if (!autoNight)' app/src/main/java/com/quietdiary/app/NightProgramService.java
+          ! grep -R -q 'nightCaptureSwitch' app/src/main
+          grep -q 'WakeTemplateStore.timeCount(this) < WakeTemplateStore.REQUIRED_TIME_SAMPLES' app/src/main/java/com/quietdiary/app/NightProgramActivity.java
+
+          # Clock reliability guard: acoustic clock hits always reach the strict text verifier.
+          python3 - <<'PY2'
+          from pathlib import Path
+          s = Path('app/src/main/java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          area = s[s.index('if (timeDetector != null)'):s.index('boolean matched = wakeDetector.accept')]
+          assert 'startTimeTextVerification(timeCandidate)' in area
+          assert 'candidateLooksLikeTime(this, timeCandidate)' not in area
+          assert 'answerCurrentTimeByVoice' in s
+          assert 'restartAudioInput();' in s[s.index('private void answerCurrentTimeByVoice'):s.index('private void pauseAudioInputForSpeech')]
+          print('Night handoff + voice clock guards: OK')
+          PY2
+
+          python3 - <<'PY2'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for p in Path('app/src/main/res').rglob('*.xml'):
+              ET.parse(p)
+          print('XML validation: OK')
+          PY2
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Nightseed-0.28.9-night-clock-debug.apk
+          cd buildsrc
+          zip -qr ../Nightseed-0.28.9-restored-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.9-night-clock-debug-apk
+          path: Nightseed-0.28.9-night-clock-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.9-restored-source
+          path: Nightseed-0.28.9-restored-source.zip
+          retention-days: 14
