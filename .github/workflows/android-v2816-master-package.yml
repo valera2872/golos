@@ -1,0 +1,145 @@
+name: Package Nightseed 0.28.16 for master audio injection
+
+on:
+  pull_request:
+    branches: [ agent/v0-28-5-ux-fix ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Nightseed 0.28.16 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v2816-manual-record-sounds.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.15 project', '/tmp/run-v2816-restore.sh')
+          extract('Apply 0.28.16 manual capture and sound library', '/tmp/run-v2816-apply.sh')
+          PY
+          bash /tmp/run-v2816-restore.sh
+          bash /tmp/run-v2816-apply.sh
+
+      - name: Prepare built-in audio slots for supplied masters
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          python3 - <<'PY'
+          from pathlib import Path
+          activity = Path('app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java')
+          s = activity.read_text(encoding='utf-8')
+          old = '        bindResourceButton(R.id.soundEnergyButton, R.raw.music_calm_energy, "Спокойная энергия");'
+          new = '        findViewById(R.id.soundEnergyButton).setVisibility(View.GONE);'
+          if old not in s: raise SystemExit('energy binding not found')
+          s = s.replace(old, new, 1)
+          old = '        bindOptionalResource(R.id.soundRainButton, "nature_rain", "Ночной дождь", natureAvailability);'
+          new = '        bindResourceButton(R.id.soundRainButton, R.raw.music_calm_energy, "Мягкая природа");'
+          if old not in s: raise SystemExit('rain binding not found')
+          s = s.replace(old, new, 1)
+          activity.write_text(s, encoding='utf-8')
+
+          layout = Path('app/src/main/res/layout/activity_sound_library.xml')
+          x = layout.read_text(encoding='utf-8')
+          x = x.replace('android:text="☂  Ночной дождь"', 'android:text="✦  Мягкая природа  ·  10 мин"', 1)
+          x = x.replace('android:text="✦  Ночной лес"', 'android:text="✦  Ночной лес  ·  10 мин"', 1)
+          x = x.replace('android:text="Слоты готовы. Нужны исходные master-файлы природы для этой сборки."', 'android:text="Морской прибой и тихий ручей добавим следующим пакетом."', 1)
+          x = x.replace('android:text="Два новых master-трека будут доступны после добавления аудиофайлов в сборку."', 'android:text="Дополнительные мелодии добавим следующим пакетом."', 1)
+          layout.write_text(x, encoding='utf-8')
+          PY
+
+          # Existing three music resources are already compiled as placeholders by the restored chain.
+          # Add a real resource ID for the forest; it will be replaced locally by the supplied master.
+          mkdir -p app/src/main/res/raw
+          cp app/src/main/res/raw/music_sea_harp.mp3 app/src/main/res/raw/nature_forest.mp3
+
+          grep -q 'setVisibility(View.GONE)' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'R.raw.music_calm_energy, "Мягкая природа"' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'nature_forest' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'Мягкая природа' app/src/main/res/layout/activity_sound_library.xml
+          test -s app/src/main/res/raw/nature_forest.mp3
+
+          # Critical night kernel remains frozen.
+          echo '8f7f71d13464844fcd799f25ce66af530a21ec587188102c094ff8c21ee43c0b  app/src/main/java/com/quietdiary/app/NightCaptureService.java' | sha256sum -c -
+          echo '47bb7afc2548d6eb74088e64a89a574cd5b6d2b8982ee4e6361bf6920ad7b293  app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java' | sha256sum -c -
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Create dedicated debug signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          rm -f "$HOME/.android/debug.keystore"
+          keytool -genkeypair -noprompt \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Nightseed 0.28.16 Debug,O=Somnori,C=ME" \
+            -keyalg RSA -keysize 2048 -validity 10000
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and placeholder APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Verify resource slots and prepare injection kit
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          for entry in \
+            res/raw/music_sea_harp.mp3 \
+            res/raw/music_calm_energy.mp3 \
+            res/raw/music_quiet_meditation.mp3 \
+            res/raw/nature_forest.mp3; do
+            unzip -l "$APK" "$entry" | grep -q "$entry"
+          done
+          mkdir -p injection-kit/lib64
+          cp "$APK" injection-kit/Nightseed-0.28.16-audio-slots-debug.apk
+          cp "$HOME/.android/debug.keystore" injection-kit/debug.keystore
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib/apksigner.jar" injection-kit/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/35.0.0/zipalign" injection-kit/zipalign
+          cp "$ANDROID_HOME/build-tools/35.0.0/lib64/libc++.so" injection-kit/lib64/libc++.so
+          chmod +x injection-kit/zipalign
+          cat > injection-kit/README.txt <<'EOF'
+          Replace these APK entries, then zipalign and re-sign:
+          res/raw/music_sea_harp.mp3       <- Beside the Sea / harp and ocean master
+          res/raw/music_calm_energy.mp3    <- Meditation and Gentle Nature master (UI: Мягкая природа)
+          res/raw/music_quiet_meditation.mp3 <- Music for Relax / Yoga / Meditation master
+          res/raw/nature_forest.mp3        <- Deep Forest Birds master
+          alias=androiddebugkey
+          storepass=android
+          keypass=android
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightseed-0.28.16-master-audio-injection-kit
+          path: injection-kit
+          retention-days: 7
