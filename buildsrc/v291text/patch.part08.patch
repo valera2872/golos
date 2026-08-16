@@ -1,0 +1,148 @@
+                 .replaceAll("[^а-яa-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+--- a/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
++++ b/app/src/main/java/com/quietdiary/app/VoiceCommandMatcher.java
+@@ -49,6 +49,16 @@
+         // Accept natural Google variants such as "ночной выключить режим" or
+         // "выключи дневник" while requiring the control words near the end.
+         return hasStop && ((hasNight && hasMode) || hasDiary || tail.equals("ночь стоп"));
++    }
++
++    /** Matches the fixed, separately trained hands-free alarm trigger. */
++    public static boolean isAlarmTrigger(String text) {
++        String normalized = normalize(text);
++        if (normalized.isEmpty()) return false;
++        String tail = tail(normalized, 4);
++        return tail.equals("будильник")
++                || tail.equals("голосовой будильник")
++                || tail.endsWith(" будильник");
+     }
+ 
+     /** Matches only short, explicit requests for the current time. */
+--- a/app/src/main/java/com/quietdiary/app/VoiceUtteranceCollector.java
++++ b/app/src/main/java/com/quietdiary/app/VoiceUtteranceCollector.java
+@@ -0,0 +1,70 @@
++package com.quietdiary.app;
++
++import java.io.ByteArrayOutputStream;
++import java.io.IOException;
++import java.util.ArrayDeque;
++
++/** Small VAD-only collector for the second turn of a hands-free voice dialog. */
++public final class VoiceUtteranceCollector {
++    private static final int SAMPLE_RATE = 16000;
++    private static final int MIN_SAMPLES = SAMPLE_RATE / 4;
++    private static final int MAX_SAMPLES = SAMPLE_RATE * 8;
++    private static final int END_SILENCE_BLOCKS = 9;
++
++    private final ArrayDeque<short[]> preRoll = new ArrayDeque<>();
++    private final ByteArrayOutputStream segment = new ByteArrayOutputStream();
++    private boolean speaking;
++    private int silentBlocks;
++    private double noiseFloor = 260.0;
++
++    /** Returns a finished utterance once, otherwise null. */
++    public synchronized short[] accept(short[] buffer, int count) {
++        double rms = AudioFingerprint.rms(buffer, 0, count);
++        double startThreshold = Math.max(430.0, noiseFloor * 2.25 + 90.0);
++        double endThreshold = Math.max(320.0, noiseFloor * 1.50 + 55.0);
++
++        if (!speaking && rms < startThreshold) {
++            noiseFloor = noiseFloor * 0.985 + rms * 0.015;
++            addPreRoll(buffer, count);
++            return null;
++        }
++        if (!speaking) {
++            speaking = true;
++            silentBlocks = 0;
++            segment.reset();
++            try {
++                for (short[] block : preRoll) segment.write(WakeTemplateStore.shortsToBytes(block, block.length));
++            } catch (IOException ignored) { }
++            preRoll.clear();
++        }
++        try { segment.write(WakeTemplateStore.shortsToBytes(buffer, count)); }
++        catch (IOException ignored) { }
++        if (rms < endThreshold) silentBlocks++; else silentBlocks = 0;
++        int samples = segment.size() / 2;
++        if ((samples >= MIN_SAMPLES && silentBlocks >= END_SILENCE_BLOCKS) || samples >= MAX_SAMPLES) {
++            short[] result = bytesToShorts(segment.toByteArray());
++            reset();
++            return result.length >= MIN_SAMPLES ? result : null;
++        }
++        return null;
++    }
++
++    public synchronized void reset() {
++        speaking = false;
++        silentBlocks = 0;
++        segment.reset();
++        preRoll.clear();
++    }
++
++    private void addPreRoll(short[] buffer, int count) {
++        preRoll.addLast(java.util.Arrays.copyOf(buffer, count));
++        while (preRoll.size() > 3) preRoll.removeFirst();
++    }
++
++    private static short[] bytesToShorts(byte[] bytes) {
++        short[] result = new short[bytes.length / 2];
++        for (int i = 0; i < result.length; i++)
++            result[i] = (short) ((bytes[i * 2] & 0xff) | (bytes[i * 2 + 1] << 8));
++        return result;
++    }
++}
+--- a/app/src/main/java/com/quietdiary/app/WakeAlarmReceiver.java
++++ b/app/src/main/java/com/quietdiary/app/WakeAlarmReceiver.java
+@@ -23,7 +23,7 @@
+                 .getBoolean(WakeAlarmScheduler.KEY_TEST, false);
+         boolean dailyEnabled = context.getSharedPreferences(WakeAlarmScheduler.PREFS,
+                 Context.MODE_PRIVATE).getBoolean(WakeAlarmScheduler.KEY_ENABLED, false);
+-        if (test) {
++        if (test || !dailyEnabled) {
+             context.getSharedPreferences(WakeAlarmScheduler.PREFS, Context.MODE_PRIVATE).edit()
+                     .putBoolean(WakeAlarmScheduler.KEY_TEST, false)
+                     .putLong(WakeAlarmScheduler.KEY_NEXT_AT, 0L)
+--- a/app/src/main/java/com/quietdiary/app/WakeAlarmScheduler.java
++++ b/app/src/main/java/com/quietdiary/app/WakeAlarmScheduler.java
+@@ -60,6 +60,29 @@
+         return scheduleAt(context, System.currentTimeMillis() + 60_000L, true);
+     }
+ 
++    /** Sets the next wake time from the night voice dialog. Existing daily mode is preserved. */
++    public static boolean scheduleVoiceTime(Context context, int hour, int minute) {
++        if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return false;
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
++                .putInt(KEY_HOUR, hour)
++                .putInt(KEY_MINUTE, minute)
++                .putBoolean(KEY_TEST, false)
++                .apply();
++        boolean daily = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                .getBoolean(KEY_ENABLED, false);
++        return daily ? scheduleDaily(context)
++                : scheduleAt(context, nextDailyAt(hour, minute, System.currentTimeMillis()), false);
++    }
++
++    /** Voice cancellation means no next signal and also disables recurring wake mode. */
++    public static void cancelFromVoice(Context context) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
++                .putBoolean(KEY_ENABLED, false)
++                .apply();
++        cancel(context);
++    }
++
++
+     public static boolean scheduleAt(Context context, long at, boolean test) {
+         AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+         if (!canScheduleExact(context)) return false;
+--- a/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
++++ b/app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+@@ -21,11 +21,13 @@
+     public static final int REQUIRED_DREAM_SAMPLES = 3;
+     public static final int REQUIRED_TIME_SAMPLES = 3;
+     public static final int REQUIRED_STOP_SAMPLES = 3;
++    public static final int REQUIRED_ALARM_SAMPLES = 3;
+     private static final String PREFS = "settings";
+     private static final String KEY_THRESHOLD = "acoustic_wake_threshold";
+     private static final String KEY_DREAM_THRESHOLD = "acoustic_dream_threshold";
+     private static final String KEY_TIME_THRESHOLD = "acoustic_time_threshold";
+     private static final String KEY_STOP_THRESHOLD = "acoustic_stop_threshold";
