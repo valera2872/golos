@@ -1,0 +1,137 @@
+                 == PackageManager.PERMISSION_GRANTED) recordTimeTrainingSample();
+         else timeTrainingPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+@@ -545,6 +565,55 @@
+         });
+     }
+ 
++    private void ensurePermissionAndAlarmTrain() {
++        if (!canTrain()) return;
++        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
++                == PackageManager.PERMISSION_GRANTED) recordAlarmTrainingSample();
++        else alarmTrainingPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
++    }
++
++    private void recordAlarmTrainingSample() {
++        final String label = "Будильник";
++        int existing = WakeTemplateStore.alarmCount(this);
++        String trainedLabel = getSharedPreferences("settings", MODE_PRIVATE)
++                .getString("trained_alarm_label", "");
++        if (existing >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES
++                || !normalizeLabel(label).equals(normalizeLabel(trainedLabel))) {
++            WakeTemplateStore.clearAlarm(this);
++            existing = 0;
++        }
++        int target = existing + 1;
++        setTrainingControlsEnabled(false);
++        alarmTrainingStatus.setText("Приготовьтесь: пример «Будильник» " + target + " из 3");
++        WakeWordTrainer.recordAlarmSample(this, new WakeWordTrainer.Listener() {
++            @Override public void onReadyToSpeak() {
++                runOnUiThread(() -> {
++                    alarmTrainingStatus.setText("Скажите: «Будильник»…");
++                    vibrate(70);
++                });
++            }
++            @Override public void onSampleSaved(int totalCount, int durationMs,
++                                                boolean trainingComplete, double threshold) {
++                runOnUiThread(() -> {
++                    getSharedPreferences("settings", MODE_PRIVATE).edit()
++                            .putString("trained_alarm_label", label)
++                            .apply();
++                    alarmTrainingStatus.setText(totalCount >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES
++                            ? "✓ Голосовой будильник готов. Ночью скажите «Будильник»."
++                            : "Пример сохранён. Осталось: "
++                            + (WakeTemplateStore.REQUIRED_ALARM_SAMPLES - totalCount));
++                    renderTrainingState();
++                });
++            }
++            @Override public void onError(String message) {
++                runOnUiThread(() -> {
++                    alarmTrainingStatus.setText("Не удалось записать команду будильника: " + message);
++                    renderTrainingState();
++                });
++            }
++        });
++    }
++
+     private void ensurePermissionAndStopTrain() {
+         if (!canTrain()) return;
+         String label = currentStopLabel();
+@@ -552,6 +621,10 @@
+         if (normalized.equals("сохранить") || normalized.equals("сохрани")
+                 || normalized.equals("отмена") || normalized.equals("отменить")) {
+             Toast.makeText(this, "Эта фраза занята командой записи", Toast.LENGTH_LONG).show();
++            return;
++        }
++        if (isAlarmReservedPhrase(normalized)) {
++            Toast.makeText(this, "Эта фраза занята голосовым будильником", Toast.LENGTH_LONG).show();
+             return;
+         }
+         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+@@ -686,6 +759,7 @@
+         fastTrainWakeButton.setEnabled(enabled);
+         trainDreamWakeButton.setEnabled(enabled);
+         trainTimeWakeButton.setEnabled(enabled);
++        trainAlarmWakeButton.setEnabled(enabled);
+         trainStopWakeButton.setEnabled(enabled);
+         wakePhraseInput.setEnabled(enabled);
+         timePhraseInput.setEnabled(enabled);
+@@ -713,6 +787,7 @@
+         fastTrainWakeButton.setEnabled(!serviceRunning && !busy && ready);
+         trainDreamWakeButton.setEnabled(!serviceRunning && !busy && ready);
+         trainTimeWakeButton.setEnabled(!serviceRunning && !busy);
++        trainAlarmWakeButton.setEnabled(!serviceRunning && !busy);
+         trainStopWakeButton.setEnabled(!serviceRunning && !busy);
+         wakePhraseInput.setEnabled(!serviceRunning && !busy);
+         timePhraseInput.setEnabled(!serviceRunning && !busy);
+@@ -803,6 +878,20 @@
+             trainTimeWakeButton.setText("Настроить голосовые часы");
+         }
+ 
++        String trainedAlarm = prefs.getString("trained_alarm_label", "");
++        int alarm = WakeTemplateStore.alarmCount(this);
++        boolean alarmMatch = normalizeLabel("Будильник").equals(normalizeLabel(trainedAlarm));
++        if (alarm >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES && alarmMatch) {
++            alarmTrainingStatus.setText("Независимая команда «Будильник» готова: 3 из 3.");
++            trainAlarmWakeButton.setText("Переобучить команду «Будильник»");
++        } else if (alarm > 0 && alarmMatch) {
++            alarmTrainingStatus.setText("Команда будильника: " + alarm + " из 3.");
++            trainAlarmWakeButton.setText("Записать пример " + (alarm + 1) + " из 3");
++        } else {
++            alarmTrainingStatus.setText("Необязательно. Нужна только для управления будильником голосом ночью.");
++            trainAlarmWakeButton.setText("Настроить команду «Будильник»");
++        }
++
+         String stopLabel = currentStopLabel();
+         String trainedStop = prefs.getString("trained_stop_label", "");
+         int stop = WakeTemplateStore.stopCount(this);
+@@ -867,7 +956,8 @@
+             return "Кодовая фраза должна состоять из 2–4 слов.";
+         }
+         if (normalized.equals("сохранить запись") || normalized.equals("отменить запись")
+-                || normalized.equals("ночь стоп") || normalized.equals("который час")) {
++                || normalized.equals("ночь стоп") || normalized.equals("который час")
++                || isAlarmReservedPhrase(normalized)) {
+             return "Эта фраза занята другой командой. Выберите другую.";
+         }
+         boolean hasDistinctiveWord = false;
+@@ -903,7 +993,8 @@
+             return "Фраза сна должна отличаться от основной команды записи.";
+         }
+         if (normalized.equals(normalizeLabel(currentTimeLabel()))
+-                || normalized.equals(normalizeLabel(currentStopLabel()))) {
++                || normalized.equals(normalizeLabel(currentStopLabel()))
++                || isAlarmReservedPhrase(normalized)) {
+             return "Эта фраза уже занята другой ночной командой.";
+         }
+         return "";
+@@ -921,6 +1012,11 @@
+         return value.isEmpty() ? "Ночь стоп" : value;
+     }
+ 
++    private static boolean isAlarmReservedPhrase(String normalized) {
++        return normalized != null && (normalized.equals("будильник")
++                || normalized.endsWith(" будильник"));
++    }
++
+     private static String normalizeLabel(String value) {
+         return value == null ? "" : value.toLowerCase(Locale.ROOT).replace('ё', 'е')
