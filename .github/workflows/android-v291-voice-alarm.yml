@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat buildsrc/v291/patch.part*.b64 > /tmp/v291.patch.gz.b64
+          cat buildsrc/v291/patch.part*.b64 | tr -d '[:space:]' > /tmp/v291.patch.gz.b64
           echo '0e402d90ef55ee65c5f1b5f4be92453b04a1a1c3b466d331c94d42977945c8e8  /tmp/v291.patch.gz.b64' | sha256sum -c -
           base64 -d /tmp/v291.patch.gz.b64 | gzip -dc > /tmp/v291.patch
           cd buildsrc/quiet-diary
