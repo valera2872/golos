@@ -1,0 +1,112 @@
+name: Build Somnori 0.29.1 voice alarm
+
+on:
+  pull_request:
+    branches: [ agent/v0-29-somnori-branding ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.29.0 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v290-somnori.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.16 project', '/tmp/run-v290-restore.sh')
+          extract('Apply Somnori 0.29.0 rebrand and capture UX', '/tmp/run-v290-apply.sh')
+          PY
+          bash /tmp/run-v290-restore.sh
+          bash /tmp/run-v290-apply.sh
+
+      - name: Apply Somnori 0.29.1 voice alarm patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat buildsrc/v291/patch.part*.b64 > /tmp/v291.patch.gz.b64
+          echo '0e402d90ef55ee65c5f1b5f4be92453b04a1a1c3b466d331c94d42977945c8e8  /tmp/v291.patch.gz.b64' | sha256sum -c -
+          base64 -d /tmp/v291.patch.gz.b64 | gzip -dc > /tmp/v291.patch
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v291.patch
+
+          grep -q 'versionCode = 2901' app/build.gradle.kts
+          grep -q 'versionName = "0.29.1"' app/build.gradle.kts
+          grep -q 'enum Kind { ENTRY, DREAM, TIME, ALARM, STOP, NONE }' app/src/main/java/com/quietdiary/app/NightCommandRouter.java
+          grep -q 'trainAlarmWakeButton' app/src/main/res/layout/activity_settings.xml
+          grep -q 'recordAlarmSample' app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
+          grep -q 'candidateLooksLikeAlarm' app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'scheduleVoiceTime' app/src/main/java/com/quietdiary/app/WakeAlarmScheduler.java
+          grep -q 'RussianAlarmCommandParser.parse' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'VoiceUtteranceCollector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+
+          # Recognition reliability baseline must remain intact.
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'alarmDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          settings=(root/'res/layout/activity_settings.xml').read_text(encoding='utf-8')
+          assert 'ГОЛОСОВОЙ БУДИЛЬНИК · ЭКСПЕРИМЕНТ' in settings
+          assert 'Будильник без касания телефона' in settings
+          blocks=re.findall(r'<com\.google\.android\.material\.button\.MaterialButton\b.*?/>', settings, re.S)
+          for block in blocks:
+              assert not re.search(r'android:layout_height="\d+dp"', block), 'fixed-height button regression'
+          print('Somnori 0.29.1 static guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Somnori-0.29.1-voice-alarm-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.29.1-voice-alarm-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.1-voice-alarm-debug-apk
+          path: Somnori-0.29.1-voice-alarm-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.1-voice-alarm-source
+          path: Somnori-0.29.1-voice-alarm-source.zip
+          retention-days: 14
