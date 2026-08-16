@@ -1,0 +1,147 @@
++        GoogleSpeechTranscriber.transcribeSamples(candidate,
++                new GoogleSpeechTranscriber.TranscriptionListener() {
++                    @Override public void onComplete(String text) {
++                        if (wakeVerificationGeneration.get() != generation || !running.get()) return;
++                        WakePhraseTextMatcher.MatchResult custom =
++                                WakePhraseTextMatcher.match(alarmLabel, text);
++                        boolean matched = custom.matched || VoiceCommandMatcher.isAlarmTrigger(text);
++                        wakeVerificationResult.set(new WakeVerificationResult(
++                                matched, text, "", custom.matchedAnchor));
++                    }
+                     @Override public void onError(String message) {
+                         if (wakeVerificationGeneration.get() != generation || !running.get()) return;
+                         wakeVerificationResult.set(new WakeVerificationResult(false, "", message, ""));
+@@ -990,6 +1107,127 @@
+         return initialized;
+     }
+ 
++    private void startAlarmVoiceDialog() {
++        wakeVerificationGeneration.incrementAndGet();
++        wakeVerificationStartedAt = 0L;
++        wakeVerificationInProgress.set(false);
++        wakeVerificationResult.set(null);
++        verificationPurpose = VerificationPurpose.ENTRY;
++        clearWakeVerificationBuffer();
++        alarmDialogResult.set(null);
++        alarmDialogTranscribing = false;
++        alarmDialogListening = false;
++        alarmUtteranceCollector.reset();
++
++        long next = getSharedPreferences(WakeAlarmScheduler.PREFS, MODE_PRIVATE)
++                .getLong(WakeAlarmScheduler.KEY_NEXT_AT, 0L);
++        String prompt = next > System.currentTimeMillis()
++                ? "Будильник установлен на " + formatAlarmTime(next)
++                    + ". Назовите новое время или скажите выключить будильник."
++                : "Будильник не установлен. Назовите время, например восемь тридцать.";
++        setMode(MODE_SPEAKING);
++        updateNotification(prompt);
++        pauseAudioInputForSpeech();
++        speakAndWait(prompt);
++        if (!running.get()) return;
++        try {
++            restartAudioInput();
++            lastAudioReadAt = System.currentTimeMillis();
++            consecutiveReadErrors = 0;
++            alarmUtteranceCollector.reset();
++            alarmDialogStartedAt = System.currentTimeMillis();
++            alarmDialogListening = true;
++            alarmDialogTranscribing = false;
++            wakeArmed = false;
++            setMode(MODE_VERIFYING);
++            updateNotification("Будильник · жду новое время или команду выключения");
++        } catch (Exception e) {
++            Log.e(TAG, "Unable to start alarm voice dialog", e);
++            alarmDialogListening = false;
++            requestRecovery("не удалось открыть диалог будильника: " + safeMessage(e));
++        }
++    }
++
++    private void handleAlarmDialogResult(WakeVerificationResult result) {
++        alarmDialogListening = false;
++        alarmDialogTranscribing = false;
++        alarmDialogStartedAt = 0L;
++        alarmUtteranceCollector.reset();
++        if (!result.error.isEmpty()) {
++            finishAlarmDialogByVoice("Не удалось распознать время. Будильник не изменён.");
++            return;
++        }
++        RussianAlarmCommandParser.Result parsed = RussianAlarmCommandParser.parse(result.recognizedText);
++        if (parsed.action == RussianAlarmCommandParser.Action.CANCEL) {
++            WakeAlarmScheduler.cancelFromVoice(this);
++            finishAlarmDialogByVoice("Будильник выключен.");
++            return;
++        }
++        if (parsed.action == RussianAlarmCommandParser.Action.QUERY
++                || parsed.action == RussianAlarmCommandParser.Action.KEEP) {
++            finishAlarmDialogByVoice(currentAlarmStatusSpeech());
++            return;
++        }
++        if (parsed.hasTime()) {
++            if (!WakeAlarmScheduler.canScheduleExact(this)) {
++                finishAlarmDialogByVoice("Я не установил будильник. Сначала разрешите точные будильники в настройках Somnori.");
++                return;
++            }
++            boolean scheduled = WakeAlarmScheduler.scheduleVoiceTime(this, parsed.hour, parsed.minute);
++            if (scheduled) {
++                finishAlarmDialogByVoice("Будильник установлен на "
++                        + spokenClock(parsed.hour, parsed.minute) + ".");
++            } else {
++                finishAlarmDialogByVoice("Не удалось установить будильник. Проверьте разрешение будильников Android.");
++            }
++            return;
++        }
++        String detail = parsed.error.isEmpty() ? "Не понял время." : parsed.error + ".";
++        finishAlarmDialogByVoice(detail + " Будильник не изменён.");
++    }
++
++    private void finishAlarmDialogByVoice(String spoken) {
++        alarmDialogListening = false;
++        alarmDialogTranscribing = false;
++        alarmDialogStartedAt = 0L;
++        alarmDialogResult.set(null);
++        alarmUtteranceCollector.reset();
++        setMode(MODE_SPEAKING);
++        updateNotification(spoken);
++        pauseAudioInputForSpeech();
++        speakAndWait(spoken);
++        if (!running.get()) return;
++        try {
++            restartAudioInput();
++            lastAudioReadAt = System.currentTimeMillis();
++            consecutiveReadErrors = 0;
++            enterWaitingMode(false);
++        } catch (Exception e) {
++            setMode(MODE_WAITING);
++            requestRecovery("не удалось вернуться после голосового будильника: " + safeMessage(e));
++        }
++    }
++
++    private String currentAlarmStatusSpeech() {
++        long next = getSharedPreferences(WakeAlarmScheduler.PREFS, MODE_PRIVATE)
++                .getLong(WakeAlarmScheduler.KEY_NEXT_AT, 0L);
++        return next > System.currentTimeMillis()
++                ? "Будильник установлен на " + formatAlarmTime(next) + "."
++                : "Будильник не установлен.";
++    }
++
++    private String formatAlarmTime(long at) {
++        Calendar c = Calendar.getInstance();
++        c.setTimeInMillis(at);
++        return spokenClock(c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE));
++    }
++
++    private String spokenClock(int hour, int minute) {
++        if (minute == 0) return hour + " " + plural(hour, "час", "часа", "часов");
++        return hour + " " + plural(hour, "час", "часа", "часов")
++                + " " + minute + " " + plural(minute, "минута", "минуты", "минут");
++    }
++
+     private void answerCurrentTimeByVoice(String source) {
+         long duration = currentStartedAt <= 0L ? 0L : System.currentTimeMillis() - currentStartedAt;
+         wakeVerificationGeneration.incrementAndGet();
+@@ -1281,6 +1519,11 @@
+         wakeVerificationResult.set(null);
+         verificationPurpose = VerificationPurpose.ENTRY;
+         clearWakeVerificationBuffer();
++        alarmDialogListening = false;
++        alarmDialogTranscribing = false;
