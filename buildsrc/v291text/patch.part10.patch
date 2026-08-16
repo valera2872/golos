@@ -1,0 +1,133 @@
+                 } else if (kind == Kind.STOP) {
+                     sampleNumber = WakeTemplateStore.saveNextStop(app, voice);
+                     complete = sampleNumber >= WakeTemplateStore.REQUIRED_STOP_SAMPLES;
++                } else if (kind == Kind.ALARM) {
++                    sampleNumber = WakeTemplateStore.saveNextAlarm(app, voice);
++                    complete = sampleNumber >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES;
+                 } else {
+                     sampleNumber = WakeTemplateStore.saveNext(app, voice);
+                     complete = WakeTemplateStore.isTrainingReady(app);
+@@ -150,9 +157,11 @@
+                 else if (kind == Kind.DREAM && complete) threshold = WakeTemplateStore.calibrateDream(app);
+                 else if (kind == Kind.TIME && complete) threshold = WakeTemplateStore.calibrateTime(app);
+                 else if (kind == Kind.STOP && complete) threshold = WakeTemplateStore.calibrateStop(app);
++                else if (kind == Kind.ALARM && complete) threshold = WakeTemplateStore.calibrateAlarm(app);
+                 else if (kind == Kind.DREAM) threshold = WakeTemplateStore.dreamThreshold(app);
+                 else if (kind == Kind.TIME) threshold = WakeTemplateStore.timeThreshold(app);
+                 else if (kind == Kind.STOP) threshold = WakeTemplateStore.stopThreshold(app);
++                else if (kind == Kind.ALARM) threshold = WakeTemplateStore.alarmThreshold(app);
+                 else threshold = WakeTemplateStore.threshold(app);
+                 BUSY.set(false);
+                 main.post(() -> listener.onSampleSaved(sampleNumber, durationMs, complete, threshold));
+--- a/app/src/main/res/layout/activity_settings.xml
++++ b/app/src/main/res/layout/activity_settings.xml
+@@ -466,6 +466,63 @@
+                 android:layout_height="wrap_content"
+                 android:layout_marginTop="7dp"
+                 android:text="Команда времени: 0 из 3."
++                android:textColor="@color/qd_muted"
++                android:textSize="13sp" />
++        </LinearLayout>
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="14dp"
++            android:background="@drawable/card_background"
++            android:orientation="vertical">
++
++            <TextView
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:background="@drawable/chip_background"
++                android:text="ГОЛОСОВОЙ БУДИЛЬНИК · ЭКСПЕРИМЕНТ"
++                android:textColor="@color/qd_primary"
++                android:textSize="10sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="11dp"
++                android:text="Будильник без касания телефона"
++                android:textColor="@color/qd_text"
++                android:textSize="20sp"
++                android:textStyle="bold" />
++
++            <TextView
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="5dp"
++                android:text="Обучите слово «Будильник» тремя повторами. Ночью скажите «Будильник», дождитесь ответа Somnori и назовите новое время, например «восемь пятьдесят три». Можно также сказать «выключить будильник»."
++                android:textColor="@color/qd_muted"
++                android:textSize="13sp" />
++
++            <com.google.android.material.button.MaterialButton
++                android:id="@+id/trainAlarmWakeButton"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:maxLines="3"
++                android:minHeight="52dp"
++                android:layout_marginTop="10dp"
++                android:text="Настроить команду «Будильник»"
++                android:textAllCaps="false"
++                android:textColor="@color/qd_primary_dark"
++                app:backgroundTint="@color/qd_primary"
++                app:cornerRadius="17dp"
++                android:letterSpacing="0" />
++
++            <TextView
++                android:id="@+id/alarmTrainingStatus"
++                android:layout_width="match_parent"
++                android:layout_height="wrap_content"
++                android:layout_marginTop="7dp"
++                android:text="Команда будильника: 0 из 3."
+                 android:textColor="@color/qd_muted"
+                 android:textSize="13sp" />
+         </LinearLayout>
+--- a/app/src/test/java/com/quietdiary/app/NightCommandRouterTest.java
++++ b/app/src/test/java/com/quietdiary/app/NightCommandRouterTest.java
+@@ -7,10 +7,11 @@
+     private static final String ENTRY = "Дневник запись";
+     private static final String DREAM = "Дневник сон";
+     private static final String TIME = "Который час";
++    private static final String ALARM = "Будильник";
+     private static final String STOP = "Ночь стоп";
+ 
+     private NightCommandRouter.Decision route(String text, NightCommandRouter.Kind gate) {
+-        return NightCommandRouter.route(text, ENTRY, DREAM, TIME, STOP, gate);
++        return NightCommandRouter.route(text, ENTRY, DREAM, TIME, ALARM, STOP, gate);
+     }
+ 
+     @Test public void timeGateCannotStealFullDiaryPhrase() {
+@@ -32,9 +33,13 @@
+         assertEquals(NightCommandRouter.Kind.STOP, route("ночь стоп", NightCommandRouter.Kind.TIME).kind);
+     }
+ 
++    @Test public void alarmPhraseRoutesToAlarm() {
++        assertEquals(NightCommandRouter.Kind.ALARM, route("будильник", NightCommandRouter.Kind.TIME).kind);
++    }
++
+     @Test public void customDreamPhraseRoutesToDream() {
+         NightCommandRouter.Decision decision = NightCommandRouter.route(
+-                "запомни мой сон", ENTRY, "Запомни мой сон", TIME, STOP,
++                "запомни мой сон", ENTRY, "Запомни мой сон", TIME, ALARM, STOP,
+                 NightCommandRouter.Kind.ENTRY);
+         assertEquals(NightCommandRouter.Kind.DREAM, decision.kind);
+     }
+--- a/app/src/test/java/com/quietdiary/app/RussianAlarmCommandParserTest.java
++++ b/app/src/test/java/com/quietdiary/app/RussianAlarmCommandParserTest.java
+@@ -0,0 +1,40 @@
++package com.quietdiary.app;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertTrue;
++import org.junit.Test;
++
++public class RussianAlarmCommandParserTest {
++    @Test public void parsesNaturalTime() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("восемь часов пятьдесят три минуты");
++        assertTrue(r.hasTime()); assertEquals(8, r.hour); assertEquals(53, r.minute);
++    }
++    @Test public void parsesCompactWords() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("восемь тридцать");
