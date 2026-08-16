@@ -2,7 +2,7 @@ name: Build Somnori 0.29.1 voice alarm
 
 on:
   pull_request:
-    branches: [ agent/v0-29-somnori-branding ]
+    branches: [ agent/v0-29-somnori-branding, agent/v0-28-5-ux-fix ]
   workflow_dispatch:
 
 permissions:
