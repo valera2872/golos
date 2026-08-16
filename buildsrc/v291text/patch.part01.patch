@@ -1,0 +1,138 @@
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -11,8 +11,8 @@
+         applicationId = "com.quietdiary.app"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2900
+-        versionName = "0.29.0"
++        versionCode = 2901
++        versionName = "0.29.1"
+     }
+ 
+     buildTypes {
+--- a/app/src/main/java/com/quietdiary/app/NightCaptureService.java
++++ b/app/src/main/java/com/quietdiary/app/NightCaptureService.java
+@@ -78,7 +78,7 @@
+     private static final int MAX_WAKE_VERIFICATION_BUFFER_SAMPLES = SAMPLE_RATE * 12;
+ 
+     private enum PendingCommand { NONE, SAVE, CANCEL, STOP, TIME }
+-    private enum VerificationPurpose { ENTRY, DREAM, TIME, STOP }
++    private enum VerificationPurpose { ENTRY, DREAM, TIME, ALARM, STOP }
+ 
+     private static final class WakeVerificationResult {
+         final boolean matched;
+@@ -104,6 +104,11 @@
+     private final AtomicReference<WakeVerificationResult> wakeVerificationResult =
+             new AtomicReference<>();
+     private final AtomicLong wakeVerificationGeneration = new AtomicLong(0L);
++    private final VoiceUtteranceCollector alarmUtteranceCollector = new VoiceUtteranceCollector();
++    private final AtomicReference<WakeVerificationResult> alarmDialogResult = new AtomicReference<>();
++    private volatile boolean alarmDialogListening;
++    private volatile boolean alarmDialogTranscribing;
++    private volatile long alarmDialogStartedAt;
+     private final AtomicBoolean recoveryRequested = new AtomicBoolean(false);
+     private final AtomicReference<String> recoveryReason = new AtomicReference<>("");
+     private final Handler signalHandler = new Handler(Looper.getMainLooper());
+@@ -125,14 +130,17 @@
+     private AcousticWakeDetector wakeDetector;
+     private AcousticWakeDetector dreamDetector;
+     private AcousticWakeDetector timeDetector;
++    private AcousticWakeDetector alarmDetector;
+     private AcousticWakeDetector stopDetector;
+     private List<short[]> wakeTemplates;
+     private List<short[]> dreamTemplates;
+     private List<short[]> timeTemplates;
++    private List<short[]> alarmTemplates;
+     private List<short[]> stopTemplates;
+     private double wakeStoredThreshold;
+     private double dreamStoredThreshold;
+     private double timeStoredThreshold;
++    private double alarmStoredThreshold;
+     private double stopStoredThreshold;
+     private WavWriter wavWriter;
+     private FileOutputStream rawPcmWriter;
+@@ -149,6 +157,7 @@
+     private String wakeLabel = "кодовая фраза";
+     private String dreamLabel = DreamTools.DEFAULT_DREAM_WAKE_PHRASE;
+     private String timeLabel = "Который час";
++    private String alarmLabel = "Будильник";
+     private String stopLabel = "Ночь стоп";
+     private PowerManager.WakeLock wakeLock;
+     private volatile String mode = MODE_OFF;
+@@ -204,7 +213,7 @@
+                     .apply();
+             statusText = "Готовлю акустический детектор";
+             DiagnosticsStore.record(this, DiagnosticsStore.SESSION_START,
+-                    "версия 0.25.3 · адаптивное обучение", 0L, MODE_WAITING);
++                    "Somnori 0.29.1 · голосовой будильник", 0L, MODE_WAITING);
+             startForeground(NOTIFICATION_ID, buildNotification(statusText));
+             worker = new Thread(this::captureLoop, "quiet-diary-capture");
+             worker.start();
+@@ -238,6 +247,8 @@
+             dreamStoredThreshold = WakeTemplateStore.dreamThreshold(this);
+             timeTemplates = WakeTemplateStore.loadTimeForDetection(this);
+             timeStoredThreshold = WakeTemplateStore.timeThreshold(this);
++            alarmTemplates = WakeTemplateStore.loadAlarmForDetection(this);
++            alarmStoredThreshold = WakeTemplateStore.alarmThreshold(this);
+             stopTemplates = WakeTemplateStore.loadStopForDetection(this);
+             stopStoredThreshold = WakeTemplateStore.stopThreshold(this);
+             SharedPreferences preferences = getSharedPreferences("settings", MODE_PRIVATE);
+@@ -406,6 +417,11 @@
+         wakeVerificationGeneration.incrementAndGet();
+         wakeVerificationStartedAt = 0L;
+         wakeVerificationInProgress.set(false);
++        alarmDialogListening = false;
++        alarmDialogTranscribing = false;
++        alarmDialogStartedAt = 0L;
++        alarmDialogResult.set(null);
++        alarmUtteranceCollector.reset();
+         wakeVerificationResult.set(null);
+         verificationPurpose = VerificationPurpose.ENTRY;
+         clearWakeVerificationBuffer();
+@@ -427,6 +443,39 @@
+     private void processWakeAudio(short[] buffer, int count) throws Exception {
+         long now = System.currentTimeMillis();
+ 
++        if (alarmDialogListening) {
++            WakeVerificationResult dialogResult = alarmDialogResult.getAndSet(null);
++            if (dialogResult != null) {
++                alarmDialogTranscribing = false;
++                handleAlarmDialogResult(dialogResult);
++                return;
++            }
++            if (!alarmDialogTranscribing && alarmDialogStartedAt > 0L
++                    && now - alarmDialogStartedAt > 14_000L) {
++                finishAlarmDialogByVoice("Не услышал новое время. Будильник не изменён.");
++                return;
++            }
++            if (!alarmDialogTranscribing) {
++                short[] utterance = alarmUtteranceCollector.accept(buffer, count);
++                if (utterance != null && utterance.length > 0) {
++                    alarmDialogTranscribing = true;
++                    updateNotification("Будильник · распознаю время…");
++                    GoogleSpeechTranscriber.transcribeSamples(utterance,
++                            new GoogleSpeechTranscriber.TranscriptionListener() {
++                                @Override public void onComplete(String text) {
++                                    if (!running.get() || !alarmDialogListening) return;
++                                    alarmDialogResult.set(new WakeVerificationResult(true, text, "", ""));
++                                }
++                                @Override public void onError(String message) {
++                                    if (!running.get() || !alarmDialogListening) return;
++                                    alarmDialogResult.set(new WakeVerificationResult(false, "", message, ""));
++                                }
++                            });
++                }
++            }
++            return;
++        }
++
+         if (wakeVerificationInProgress.get()
+                 && wakeVerificationStartedAt > 0
+                 && now - wakeVerificationStartedAt >= WAKE_VERIFICATION_TIMEOUT_MS) {
+@@ -451,16 +500,20 @@
+             if (completed.error.isEmpty() && !completed.recognizedText.isEmpty()) {
+                 NightCommandRouter.Kind preferredKind = completedPurpose == VerificationPurpose.TIME
+                         ? NightCommandRouter.Kind.TIME
++                        : completedPurpose == VerificationPurpose.ALARM
++                        ? NightCommandRouter.Kind.ALARM
