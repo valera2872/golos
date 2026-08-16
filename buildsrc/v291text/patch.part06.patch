@@ -1,0 +1,133 @@
++    private static List<Integer> parseNumberWords(List<String> words) {
++        List<Integer> result = new ArrayList<>();
++        int i = 0;
++        while (i < words.size()) {
++            String word = words.get(i);
++            Integer small = SMALL.get(word);
++            Integer tens = TENS.get(word);
++            if (tens != null) {
++                int value = tens;
++                if (i + 1 < words.size()) {
++                    Integer unit = SMALL.get(words.get(i + 1));
++                    if (unit != null && unit >= 1 && unit <= 9) {
++                        value += unit;
++                        i++;
++                    }
++                }
++                result.add(value);
++            } else if (small != null) {
++                result.add(small);
++            }
++            i++;
++        }
++        return result;
++    }
++
++    private static Result validateTime(int hour, int minute, String normalized) {
++        if (hour < 0 || hour > 23) return unknown(normalized, "Часы должны быть от нуля до двадцати трёх");
++        if (minute < 0 || minute > 59) return unknown(normalized, "Минуты должны быть от нуля до пятидесяти девяти");
++        return new Result(Action.SET_TIME, hour, minute, normalized, "");
++    }
++
++    private static Result unknown(String normalized, String error) {
++        return new Result(Action.UNKNOWN, -1, -1, normalized, error);
++    }
++
++    private static boolean containsAny(String value, String... variants) {
++        for (String variant : variants) if (value.equals(variant) || value.contains(variant)) return true;
++        return false;
++    }
++
++    private static String normalize(String value) {
++        if (value == null) return "";
++        return Normalizer.normalize(value.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
++                .replaceAll("\\p{M}+", "")
++                .replace('ё', 'е')
++                .replaceAll("[^а-яa-z0-9:. ]", " ")
++                .replaceAll("\\s+", " ")
++                .trim();
++    }
++}
+--- a/app/src/main/java/com/quietdiary/app/SettingsActivity.java
++++ b/app/src/main/java/com/quietdiary/app/SettingsActivity.java
+@@ -39,6 +39,7 @@
+     private TextView fastTrainingStatus;
+     private TextView dreamTrainingStatus;
+     private TextView timeTrainingStatus;
++    private TextView alarmTrainingStatus;
+     private TextView stopTrainingStatus;
+     private TextView trainingProgressLabel;
+     private ProgressBar trainingProgress;
+@@ -51,6 +52,7 @@
+     private MaterialButton fastTrainWakeButton;
+     private MaterialButton trainDreamWakeButton;
+     private MaterialButton trainTimeWakeButton;
++    private MaterialButton trainAlarmWakeButton;
+     private MaterialButton trainStopWakeButton;
+     private SwitchMaterial vibrationSwitch;
+     private SwitchMaterial soundSwitch;
+@@ -82,6 +84,11 @@
+                 if (granted) recordTimeTrainingSample();
+                 else Toast.makeText(this, "Без доступа к микрофону голосовые часы обучить невозможно", Toast.LENGTH_LONG).show();
+             });
++    private final ActivityResultLauncher<String> alarmTrainingPermissionLauncher =
++            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
++                if (granted) recordAlarmTrainingSample();
++                else Toast.makeText(this, "Без доступа к микрофону голосовой будильник обучить невозможно", Toast.LENGTH_LONG).show();
++            });
+     private final ActivityResultLauncher<String> stopTrainingPermissionLauncher =
+             registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                 if (granted) recordStopTrainingSample();
+@@ -106,6 +113,7 @@
+         fastTrainingStatus = findViewById(R.id.fastTrainingStatus);
+         dreamTrainingStatus = findViewById(R.id.dreamTrainingStatus);
+         timeTrainingStatus = findViewById(R.id.timeTrainingStatus);
++        alarmTrainingStatus = findViewById(R.id.alarmTrainingStatus);
+         stopTrainingStatus = findViewById(R.id.stopTrainingStatus);
+         trainingProgressLabel = findViewById(R.id.trainingProgressLabel);
+         trainingProgress = findViewById(R.id.trainingProgress);
+@@ -118,6 +126,7 @@
+         fastTrainWakeButton = findViewById(R.id.fastTrainWakeButton);
+         trainDreamWakeButton = findViewById(R.id.trainDreamWakeButton);
+         trainTimeWakeButton = findViewById(R.id.trainTimeWakeButton);
++        trainAlarmWakeButton = findViewById(R.id.trainAlarmWakeButton);
+         trainStopWakeButton = findViewById(R.id.trainStopWakeButton);
+         vibrationSwitch = findViewById(R.id.vibrationSwitch);
+         soundSwitch = findViewById(R.id.soundSwitch);
+@@ -150,6 +159,10 @@
+                 && prefs.getString("trained_time_label", "").trim().isEmpty()) {
+             prefs.edit().putString("trained_time_label", currentTimeLabel()).apply();
+         }
++        if (WakeTemplateStore.alarmCount(this) >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES
++                && prefs.getString("trained_alarm_label", "").trim().isEmpty()) {
++            prefs.edit().putString("trained_alarm_label", "Будильник").apply();
++        }
+         if (WakeTemplateStore.stopCount(this) >= WakeTemplateStore.REQUIRED_STOP_SAMPLES
+                 && prefs.getString("trained_stop_label", "").trim().isEmpty()) {
+             prefs.edit().putString("trained_stop_label", currentStopLabel()).apply();
+@@ -173,6 +186,7 @@
+         fastTrainWakeButton.setOnClickListener(v -> ensurePermissionAndBedTrain());
+         trainDreamWakeButton.setOnClickListener(v -> ensurePermissionAndDreamTrain());
+         trainTimeWakeButton.setOnClickListener(v -> ensurePermissionAndTimeTrain());
++        trainAlarmWakeButton.setOnClickListener(v -> ensurePermissionAndAlarmTrain());
+         trainStopWakeButton.setOnClickListener(v -> ensurePermissionAndStopTrain());
+ 
+         wakePhraseInput.addTextChangedListener(new SimpleTextWatcher() {
+@@ -201,6 +215,8 @@
+                     prefs.edit().putString("stop_night_phrase", "Ночь стоп").apply();
+                 } else if (reserved) {
+                     stopPhraseStatus.setText("Эта фраза занята командой записи. Выберите другую.");
++                } else if (isAlarmReservedPhrase(normalized)) {
++                    stopPhraseStatus.setText("Эта фраза занята голосовым будильником. Выберите другую.");
+                 } else {
+                     prefs.edit().putString("stop_night_phrase", value).apply();
+                     stopPhraseStatus.setText("Самостоятельная команда: «" + value + "».");
+@@ -495,6 +511,10 @@
+             Toast.makeText(this, "Введите фразу голосовых часов", Toast.LENGTH_LONG).show();
+             return;
+         }
++        if (isAlarmReservedPhrase(normalizeLabel(label))) {
++            Toast.makeText(this, "Эта фраза занята голосовым будильником", Toast.LENGTH_LONG).show();
++            return;
++        }
+         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
