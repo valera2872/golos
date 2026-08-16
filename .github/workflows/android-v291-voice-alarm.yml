@@ -76,6 +76,39 @@ jobs:
           print('Somnori 0.29.1 static guards: OK')
           PY
 
+      - name: Preserve Somnori 0.29 master audio slots and library UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          python3 - <<'PY'
+          from pathlib import Path
+          activity = Path('app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java')
+          s = activity.read_text(encoding='utf-8')
+          old = '        bindResourceButton(R.id.soundEnergyButton, R.raw.music_calm_energy, "Спокойная энергия");'
+          new = '        findViewById(R.id.soundEnergyButton).setVisibility(View.GONE);'
+          if old in s:
+              s = s.replace(old, new, 1)
+          old = '        bindOptionalResource(R.id.soundRainButton, "nature_rain", "Ночной дождь", natureAvailability);'
+          new = '        bindResourceButton(R.id.soundRainButton, R.raw.music_calm_energy, "Мягкая природа");'
+          if old in s:
+              s = s.replace(old, new, 1)
+          activity.write_text(s, encoding='utf-8')
+
+          layout = Path('app/src/main/res/layout/activity_sound_library.xml')
+          x = layout.read_text(encoding='utf-8')
+          x = x.replace('android:text="☂  Ночной дождь"', 'android:text="✦  Мягкая природа  ·  10 мин"', 1)
+          x = x.replace('android:text="✦  Ночной лес"', 'android:text="✦  Ночной лес  ·  10 мин"', 1)
+          x = x.replace('android:text="Слоты готовы. Нужны исходные master-файлы природы для этой сборки."', 'android:text="Морской прибой и тихий ручей добавим следующим пакетом."', 1)
+          x = x.replace('android:text="Два новых master-трека будут доступны после добавления аудиофайлов в сборку."', 'android:text="Дополнительные мелодии добавим следующим пакетом."', 1)
+          layout.write_text(x, encoding='utf-8')
+          PY
+          mkdir -p app/src/main/res/raw
+          cp app/src/main/res/raw/music_sea_harp.mp3 app/src/main/res/raw/nature_forest.mp3
+          grep -q 'setVisibility(View.GONE)' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'R.raw.music_calm_energy, "Мягкая природа"' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          test -s app/src/main/res/raw/nature_forest.mp3
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -93,7 +126,11 @@ jobs:
       - name: Prepare artifacts
         shell: bash
         run: |
-          cp buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk Somnori-0.29.1-voice-alarm-debug.apk
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          for entry in res/raw/music_sea_harp.mp3 res/raw/music_calm_energy.mp3 res/raw/music_quiet_meditation.mp3 res/raw/nature_forest.mp3; do
+            unzip -l "$APK" "$entry" | grep -q "$entry"
+          done
+          cp "$APK" Somnori-0.29.1-voice-alarm-debug.apk
           cd buildsrc
           zip -qr ../Somnori-0.29.1-voice-alarm-source.zip quiet-diary
 
