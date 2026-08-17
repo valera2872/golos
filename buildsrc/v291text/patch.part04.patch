@@ -1,0 +1,113 @@
++        alarmDialogStartedAt = 0L;
++        alarmDialogResult.set(null);
++        alarmUtteranceCollector.reset();
+         earlyStartCuePlayed = false;
+         waitingNoiseFloor = 260.0;
+         wakeArmed = false;
+@@ -1315,6 +1558,7 @@
+         wakeBlockedUntil = System.currentTimeMillis() + Math.max(0L, delayMs);
+         if (wakeDetector != null) wakeDetector.reset();
+         if (timeDetector != null) timeDetector.reset();
++        if (alarmDetector != null) alarmDetector.reset();
+         if (stopDetector != null) stopDetector.reset();
+     }
+ 
+@@ -1337,6 +1581,8 @@
+         }
+         updateNotification((abortedPurpose == VerificationPurpose.TIME
+                 ? "Проверка команды времени сброшена · "
++                : abortedPurpose == VerificationPurpose.ALARM
++                ? "Проверка команды будильника сброшена · "
+                 : abortedPurpose == VerificationPurpose.STOP
+                 ? "Проверка команды выключения сброшена · "
+                 : abortedPurpose == VerificationPurpose.DREAM
+@@ -1359,6 +1605,11 @@
+             timeDetector = new AcousticWakeDetector(timeTemplates, timeStoredThreshold, false);
+         } else {
+             timeDetector = null;
++        }
++        if (alarmTemplates != null && alarmTemplates.size() >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES) {
++            alarmDetector = new AcousticWakeDetector(alarmTemplates, alarmStoredThreshold, false);
++        } else {
++            alarmDetector = null;
+         }
+         if (stopTemplates != null && stopTemplates.size() >= WakeTemplateStore.REQUIRED_STOP_SAMPLES) {
+             stopDetector = new AcousticWakeDetector(stopTemplates, stopStoredThreshold, false);
+@@ -1561,6 +1812,8 @@
+                 && stopTemplates.size() >= WakeTemplateStore.REQUIRED_STOP_SAMPLES;
+         StringBuilder result = new StringBuilder("Жду «").append(wakeLabel).append("»");
+         if (clockReady) result.append(", «").append(timeLabel).append("»");
++        boolean alarmReady = alarmTemplates != null && alarmTemplates.size() >= WakeTemplateStore.REQUIRED_ALARM_SAMPLES;
++        if (alarmReady) result.append(", «").append(alarmLabel).append("»");
+         if (stopReady) result.append(" или «").append(stopLabel).append("»");
+         return result.append(" · звук не сохраняется").toString();
+     }
+--- a/app/src/main/java/com/quietdiary/app/NightCommandRouter.java
++++ b/app/src/main/java/com/quietdiary/app/NightCommandRouter.java
+@@ -2,7 +2,7 @@
+ 
+ /** Final command arbitration after speech-to-text. Acoustic matches are gates only. */
+ public final class NightCommandRouter {
+-    public enum Kind { ENTRY, DREAM, TIME, STOP, NONE }
++    public enum Kind { ENTRY, DREAM, TIME, ALARM, STOP, NONE }
+ 
+     public static final class Decision {
+         public final Kind kind;
+@@ -16,45 +16,42 @@
+     private NightCommandRouter() {}
+ 
+     public static Decision route(String recognized, String wakeLabel, String dreamLabel,
+-                                 String timeLabel, String stopLabel,
++                                 String timeLabel, String alarmLabel, String stopLabel,
+                                  Kind preferredAcousticGate) {
+         WakePhraseTextMatcher.MatchResult entry = WakePhraseTextMatcher.match(wakeLabel, recognized);
+         WakePhraseTextMatcher.MatchResult dream = WakePhraseTextMatcher.match(dreamLabel, recognized);
+         WakePhraseTextMatcher.MatchResult time = WakePhraseTextMatcher.match(timeLabel, recognized);
++        WakePhraseTextMatcher.MatchResult alarm = WakePhraseTextMatcher.match(alarmLabel, recognized);
+         WakePhraseTextMatcher.MatchResult stop = WakePhraseTextMatcher.match(stopLabel, recognized);
+ 
+         boolean explicitDream = DreamTools.isDreamWakePhrase(recognized);
+         boolean fullEntry = entry.fullPhrase;
+         boolean fullDream = dream.fullPhrase || explicitDream;
+         boolean timeMatched = time.matched || VoiceCommandMatcher.isTimeRequest(recognized);
++        boolean alarmMatched = alarm.matched || VoiceCommandMatcher.isAlarmTrigger(recognized);
+         boolean stopMatched = stop.matched || VoiceCommandMatcher.isStopNight(recognized, stopLabel);
+ 
+         // Specific semantic/full-phrase evidence wins over shared anchor words like «дневник».
+         if (fullDream) return new Decision(Kind.DREAM,
+                 dream.matchedAnchor.isEmpty() ? "дневник сон" : dream.matchedAnchor);
+         if (fullEntry) return new Decision(Kind.ENTRY, entry.matchedAnchor);
+-        if (stopMatched && !timeMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
+-        if (timeMatched && !stopMatched) return new Decision(Kind.TIME, time.matchedAnchor);
++        if (alarmMatched && !timeMatched && !stopMatched) return new Decision(Kind.ALARM, alarm.matchedAnchor);
++        if (stopMatched && !timeMatched && !alarmMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
++        if (timeMatched && !stopMatched && !alarmMatched) return new Decision(Kind.TIME, time.matchedAnchor);
+ 
+         // Partial STT such as «дневник за» is still useful after a trained acoustic gate.
+         boolean entryAnchor = entry.matched;
+         boolean dreamAnchor = dream.matched;
+-        if (preferredAcousticGate == Kind.DREAM && dreamAnchor) {
+-            return new Decision(Kind.DREAM, dream.matchedAnchor);
+-        }
+-        if (preferredAcousticGate == Kind.ENTRY && entryAnchor) {
+-            return new Decision(Kind.ENTRY, entry.matchedAnchor);
+-        }
+-        if (preferredAcousticGate == Kind.TIME && timeMatched) {
+-            return new Decision(Kind.TIME, time.matchedAnchor);
+-        }
+-        if (preferredAcousticGate == Kind.STOP && stopMatched) {
+-            return new Decision(Kind.STOP, stop.matchedAnchor);
+-        }
++        if (preferredAcousticGate == Kind.ALARM && alarmMatched) return new Decision(Kind.ALARM, alarm.matchedAnchor);
++        if (preferredAcousticGate == Kind.DREAM && dreamAnchor) return new Decision(Kind.DREAM, dream.matchedAnchor);
++        if (preferredAcousticGate == Kind.ENTRY && entryAnchor) return new Decision(Kind.ENTRY, entry.matchedAnchor);
++        if (preferredAcousticGate == Kind.TIME && timeMatched) return new Decision(Kind.TIME, time.matchedAnchor);
++        if (preferredAcousticGate == Kind.STOP && stopMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
+ 
+         // If another detector stole an entry phrase, the shared «дневник» anchor routes it back.
+         if (entryAnchor && !explicitDream) return new Decision(Kind.ENTRY, entry.matchedAnchor);
+         if (dreamAnchor && explicitDream) return new Decision(Kind.DREAM, dream.matchedAnchor);
++        if (alarmMatched) return new Decision(Kind.ALARM, alarm.matchedAnchor);
+         if (timeMatched) return new Decision(Kind.TIME, time.matchedAnchor);
+         if (stopMatched) return new Decision(Kind.STOP, stop.matchedAnchor);
+         return new Decision(Kind.NONE, "");

@@ -1,0 +1,27 @@
++        assertEquals(8, r.hour); assertEquals(30, r.minute);
++    }
++    @Test public void parsesTwentyThreeFifteen() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("двадцать три пятнадцать");
++        assertEquals(23, r.hour); assertEquals(15, r.minute);
++    }
++    @Test public void parsesDigitsWithColon() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("на 8:53");
++        assertEquals(8, r.hour); assertEquals(53, r.minute);
++    }
++    @Test public void parsesLeadingZeroMinutes() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("восемь ноль пять");
++        assertEquals(8, r.hour); assertEquals(5, r.minute);
++    }
++    @Test public void parsesHalfPast() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("пол девятого");
++        assertEquals(8, r.hour); assertEquals(30, r.minute);
++    }
++    @Test public void parsesQuarterTo() {
++        RussianAlarmCommandParser.Result r = RussianAlarmCommandParser.parse("без четверти восемь");
++        assertEquals(7, r.hour); assertEquals(45, r.minute);
++    }
++    @Test public void parsesCancel() {
++        assertEquals(RussianAlarmCommandParser.Action.CANCEL,
++                RussianAlarmCommandParser.parse("выключить будильник").action);
++    }
++}

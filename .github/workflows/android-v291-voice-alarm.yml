@@ -1,0 +1,176 @@
+name: Build Somnori 0.29.2 alarm fix + dashboard
+
+on:
+  pull_request:
+    branches: [ agent/v0-29-somnori-branding ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.29.0 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+          lines = Path('.github/workflows/android-v290-somnori.yml').read_text(encoding='utf-8').splitlines()
+          def extract(step_name, output):
+              marker = f'      - name: {step_name}'
+              start = lines.index(marker)
+              run_line = next(i for i in range(start, len(lines)) if lines[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(lines)) if lines[i].startswith('      - ') and i > run_line + 1)
+              Path(output).write_text(textwrap.dedent('\n'.join(lines[run_line + 1:end])) + '\n', encoding='utf-8')
+          extract('Restore exact Nightseed 0.28.16 project', '/tmp/run-v290-restore.sh')
+          extract('Apply Somnori 0.29.0 rebrand and capture UX', '/tmp/run-v290-apply.sh')
+          PY
+          bash /tmp/run-v290-restore.sh
+          bash /tmp/run-v290-apply.sh
+
+      - name: Apply Somnori 0.29.1 voice alarm patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat buildsrc/v291text/patch.part*.patch > /tmp/v291.patch
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v291.patch
+
+          grep -q 'versionCode = 2901' app/build.gradle.kts
+          grep -q 'versionName = "0.29.1"' app/build.gradle.kts
+          grep -q 'enum Kind { ENTRY, DREAM, TIME, ALARM, STOP, NONE }' app/src/main/java/com/quietdiary/app/NightCommandRouter.java
+          grep -q 'trainAlarmWakeButton' app/src/main/res/layout/activity_settings.xml
+          grep -q 'recordAlarmSample' app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
+          grep -q 'candidateLooksLikeAlarm' app/src/main/java/com/quietdiary/app/WakeTemplateStore.java
+          grep -q 'scheduleVoiceTime' app/src/main/java/com/quietdiary/app/WakeAlarmScheduler.java
+          grep -q 'RussianAlarmCommandParser.parse' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'VoiceUtteranceCollector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'alarmDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+      - name: Preserve Somnori 0.29 master audio slots and library UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          python3 - <<'PY'
+          from pathlib import Path
+          activity = Path('app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java')
+          s = activity.read_text(encoding='utf-8')
+          old = '        bindResourceButton(R.id.soundEnergyButton, R.raw.music_calm_energy, "Спокойная энергия");'
+          new = '        findViewById(R.id.soundEnergyButton).setVisibility(View.GONE);'
+          if old in s:
+              s = s.replace(old, new, 1)
+          old = '        bindOptionalResource(R.id.soundRainButton, "nature_rain", "Ночной дождь", natureAvailability);'
+          new = '        bindResourceButton(R.id.soundRainButton, R.raw.music_calm_energy, "Мягкая природа");'
+          if old in s:
+              s = s.replace(old, new, 1)
+          activity.write_text(s, encoding='utf-8')
+
+          layout = Path('app/src/main/res/layout/activity_sound_library.xml')
+          x = layout.read_text(encoding='utf-8')
+          x = x.replace('android:text="☂  Ночной дождь"', 'android:text="✦  Мягкая природа  ·  10 мин"', 1)
+          x = x.replace('android:text="✦  Ночной лес"', 'android:text="✦  Ночной лес  ·  10 мин"', 1)
+          x = x.replace('android:text="Слоты готовы. Нужны исходные master-файлы природы для этой сборки."', 'android:text="Морской прибой и тихий ручей добавим следующим пакетом."', 1)
+          x = x.replace('android:text="Два новых master-трека будут доступны после добавления аудиофайлов в сборку."', 'android:text="Дополнительные мелодии добавим следующим пакетом."', 1)
+          layout.write_text(x, encoding='utf-8')
+          PY
+          mkdir -p app/src/main/res/raw
+          cp app/src/main/res/raw/music_sea_harp.mp3 app/src/main/res/raw/nature_forest.mp3
+          grep -q 'setVisibility(View.GONE)' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          grep -q 'R.raw.music_calm_energy, "Мягкая природа"' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
+          test -s app/src/main/res/raw/nature_forest.mp3
+
+      - name: Apply Somnori 0.29.2 alarm reliability and dashboard patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d buildsrc/v292/patch.gz.b64 | gzip -dc > /tmp/v292.patch
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v292.patch
+
+          grep -q 'versionCode = 2902' app/build.gradle.kts
+          grep -q 'versionName = "0.29.2"' app/build.gradle.kts
+          grep -q 'transcribeShortCommandSamples' app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt
+          grep -q 'END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/VoiceUtteranceCollector.java
+          grep -q 'alarmDialogAttempts' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q '1232' app/src/test/java/com/quietdiary/app/RussianAlarmCommandParserTest.java
+          grep -q 'dashboardNightButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'dashboardAlarmVoiceButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'dashboardPracticeButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'Что вы хотите сделать?' app/src/main/res/layout/activity_main.xml
+          grep -q 'ГОЛОС SOMNORI' app/src/main/res/layout/activity_settings.xml
+          grep -q 'focus_alarm_voice' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+
+          # Frozen recognition baseline still must not move.
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'alarmDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root=Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          main=(root/'res/layout/activity_main.xml').read_text(encoding='utf-8')
+          for expected in ['БЫСТРАЯ ЗАПИСЬ','НОЧЬ БЕЗ РУК','БУДИЛЬНИК','ПЕРЕД СНОМ','Как работает бесконтактная ночь']:
+              assert expected in main, expected
+          for p in (root/'res/layout').rglob('*.xml'):
+              text=p.read_text(encoding='utf-8')
+              for block in re.findall(r'<com\.google\.android\.material\.button\.MaterialButton\b.*?/>', text, re.S):
+                  assert not re.search(r'android:layout_height="\d+dp"', block), f'fixed-height button: {p.name}'
+          print('Somnori 0.29.2 XML + dashboard guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          for entry in res/raw/music_sea_harp.mp3 res/raw/music_calm_energy.mp3 res/raw/music_quiet_meditation.mp3 res/raw/nature_forest.mp3; do
+            unzip -l "$APK" "$entry" | grep -q "$entry"
+          done
+          cp "$APK" Somnori-0.29.2-alarm-dashboard-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.29.2-alarm-dashboard-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.2-alarm-dashboard-debug-apk
+          path: Somnori-0.29.2-alarm-dashboard-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.2-alarm-dashboard-source
+          path: Somnori-0.29.2-alarm-dashboard-source.zip
+          retention-days: 14

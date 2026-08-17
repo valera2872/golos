@@ -1,0 +1,150 @@
+--- a/app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java
++++ b/app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java
+@@ -0,0 +1,197 @@
++package com.quietdiary.app;
++
++import java.text.Normalizer;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.HashMap;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++
++/** Deterministic Russian parser for the hands-free wake-alarm dialog. */
++public final class RussianAlarmCommandParser {
++    public enum Action { SET_TIME, CANCEL, QUERY, KEEP, UNKNOWN }
++
++    public static final class Result {
++        public final Action action;
++        public final int hour;
++        public final int minute;
++        public final String normalized;
++        public final String error;
++
++        Result(Action action, int hour, int minute, String normalized, String error) {
++            this.action = action == null ? Action.UNKNOWN : action;
++            this.hour = hour;
++            this.minute = minute;
++            this.normalized = normalized == null ? "" : normalized;
++            this.error = error == null ? "" : error;
++        }
++
++        public boolean hasTime() { return action == Action.SET_TIME && hour >= 0 && minute >= 0; }
++    }
++
++    private static final Map<String, Integer> SMALL = new HashMap<>();
++    private static final Map<String, Integer> TENS = new HashMap<>();
++    private static final Set<String> FILLERS = new HashSet<>(Arrays.asList(
++            "будильник", "будильника", "будильнику", "на", "в", "к", "мне", "пожалуйста",
++            "поставь", "поставить", "установи", "установить", "измени", "изменить", "перенеси", "перенести",
++            "время", "новое", "новый", "разбуди", "разбудить", "завтра", "сегодня",
++            "час", "часа", "часов", "часу", "минут", "минута", "минуты", "минуту"
++    ));
++
++    static {
++        String[] zeroToNineteen = {
++                "ноль", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять",
++                "десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать",
++                "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"
++        };
++        for (int i = 0; i < zeroToNineteen.length; i++) SMALL.put(zeroToNineteen[i], i);
++        // Common inflected clock forms occasionally returned by STT.
++        SMALL.put("одну", 1); SMALL.put("две", 2);
++        SMALL.put("первого", 1); SMALL.put("второго", 2); SMALL.put("третьего", 3);
++        SMALL.put("четвертого", 4); SMALL.put("пятого", 5); SMALL.put("шестого", 6);
++        SMALL.put("седьмого", 7); SMALL.put("восьмого", 8); SMALL.put("девятого", 9);
++        SMALL.put("десятого", 10); SMALL.put("одиннадцатого", 11); SMALL.put("двенадцатого", 12);
++        TENS.put("двадцать", 20); TENS.put("тридцать", 30); TENS.put("сорок", 40); TENS.put("пятьдесят", 50);
++    }
++
++    private RussianAlarmCommandParser() {}
++
++    public static Result parse(String raw) {
++        String normalized = normalize(raw);
++        if (normalized.isEmpty()) return unknown(normalized, "Не услышал команду");
++
++        if (containsAny(normalized, "отмена", "отмени", "отменить", "выключи", "выключить", "сбрось", "сбросить")) {
++            return new Result(Action.CANCEL, -1, -1, normalized, "");
++        }
++        if (containsAny(normalized, "оставь", "оставить", "не менять", "оставь как есть")) {
++            return new Result(Action.KEEP, -1, -1, normalized, "");
++        }
++        if (containsAny(normalized, "сколько", "когда", "какой будильник", "во сколько")) {
++            return new Result(Action.QUERY, -1, -1, normalized, "");
++        }
++
++        Result numeric = parseDigits(normalized);
++        if (numeric != null) return numeric;
++
++        // Useful bedtime colloquialisms; keep the grammar deliberately small and deterministic.
++        Result colloquial = parseColloquial(normalized);
++        if (colloquial != null) return colloquial;
++
++        List<String> words = new ArrayList<>();
++        for (String token : normalized.split(" ")) {
++            if (!token.isEmpty() && !FILLERS.contains(token)) words.add(token);
++        }
++        List<Integer> numbers = parseNumberWords(words);
++        if (numbers.isEmpty()) return unknown(normalized, "Не понял время");
++
++        int hour;
++        int minute = 0;
++        if (numbers.size() == 1) {
++            hour = numbers.get(0);
++        } else if (numbers.size() >= 3 && numbers.get(0) == 0 && numbers.get(1) <= 23) {
++            // «ноль семь тридцать» -> 07:30.
++            hour = numbers.get(1);
++            minute = numbers.get(2);
++        } else {
++            hour = numbers.get(0);
++            if (numbers.size() >= 3 && numbers.get(1) == 0 && numbers.get(2) <= 9) minute = numbers.get(2);
++            else minute = numbers.get(1);
++        }
++        return validateTime(hour, minute, normalized);
++    }
++
++    private static Result parseDigits(String normalized) {
++        java.util.regex.Matcher colon = java.util.regex.Pattern
++                .compile("(?:^|\\s)(\\d{1,2})\\s*[:.]\\s*(\\d{1,2})(?:$|\\s)")
++                .matcher(normalized);
++        if (colon.find()) return validateTime(Integer.parseInt(colon.group(1)), Integer.parseInt(colon.group(2)), normalized);
++
++        java.util.regex.Matcher two = java.util.regex.Pattern
++                .compile("(?:^|\\s)(\\d{1,2})\\s+(\\d{1,2})(?:$|\\s)")
++                .matcher(normalized);
++        if (two.find()) return validateTime(Integer.parseInt(two.group(1)), Integer.parseInt(two.group(2)), normalized);
++
++        java.util.regex.Matcher one = java.util.regex.Pattern
++                .compile("(?:^|\\s)(\\d{1,2})(?:$|\\s)")
++                .matcher(normalized);
++        if (one.find()) return validateTime(Integer.parseInt(one.group(1)), 0, normalized);
++        return null;
++    }
++
++    private static Result parseColloquial(String normalized) {
++        // «пол девятого» / «половина девятого» = 08:30.
++        java.util.regex.Matcher half = java.util.regex.Pattern
++                .compile("(?:пол|половина)\\s+([а-я]+)")
++                .matcher(normalized);
++        if (half.find()) {
++            Integer nextHour = SMALL.get(half.group(1));
++            if (nextHour != null && nextHour >= 1 && nextHour <= 12) {
++                return validateTime((nextHour + 23) % 24, 30, normalized);
++            }
++        }
++        // «без четверти восемь» = 07:45.
++        java.util.regex.Matcher quarter = java.util.regex.Pattern
++                .compile("без\\s+четверти\\s+([а-я]+)")
++                .matcher(normalized);
++        if (quarter.find()) {
++            Integer nextHour = SMALL.get(quarter.group(1));
++            if (nextHour != null && nextHour >= 1 && nextHour <= 12) {
++                return validateTime((nextHour + 23) % 24, 45, normalized);
++            }
++        }
++        return null;
++    }
++

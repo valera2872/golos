@@ -1,0 +1,120 @@
+                         : completedPurpose == VerificationPurpose.STOP
+                         ? NightCommandRouter.Kind.STOP
+                         : completedPurpose == VerificationPurpose.DREAM
+                         ? NightCommandRouter.Kind.DREAM
+                         : NightCommandRouter.Kind.ENTRY;
+                 NightCommandRouter.Decision routed = NightCommandRouter.route(
+-                        completed.recognizedText, wakeLabel, dreamLabel, timeLabel, stopLabel, preferredKind);
++                        completed.recognizedText, wakeLabel, dreamLabel, timeLabel, alarmLabel, stopLabel, preferredKind);
+                 if (routed.kind != NightCommandRouter.Kind.NONE) {
+                     VerificationPurpose routedPurpose = routed.kind == NightCommandRouter.Kind.TIME
+                             ? VerificationPurpose.TIME
++                            : routed.kind == NightCommandRouter.Kind.ALARM
++                            ? VerificationPurpose.ALARM
+                             : routed.kind == NightCommandRouter.Kind.STOP
+                             ? VerificationPurpose.STOP
+                             : routed.kind == NightCommandRouter.Kind.DREAM
+@@ -490,6 +543,12 @@
+                     wakeCandidateDreamHint = false;
+                     clearWakeVerificationBuffer();
+                     answerCurrentTimeByVoice("самостоятельная команда «" + timeLabel + "»");
++                    return;
++                }
++                if (completedPurpose == VerificationPurpose.ALARM) {
++                    wakeCandidateDreamHint = false;
++                    clearWakeVerificationBuffer();
++                    startAlarmVoiceDialog();
+                     return;
+                 }
+                 if (completedPurpose == VerificationPurpose.STOP) {
+@@ -535,6 +594,8 @@
+                         detail, verificationLatency, MODE_VERIFYING);
+                 updateNotification(completedPurpose == VerificationPurpose.TIME
+                         ? "Команда времени не подтверждена · " + detail
++                        : completedPurpose == VerificationPurpose.ALARM
++                        ? "Команда будильника не подтверждена · " + detail
+                         : completedPurpose == VerificationPurpose.STOP
+                         ? "Команда выключения не подтверждена · " + detail
+                         : completedPurpose == VerificationPurpose.DREAM
+@@ -591,6 +652,7 @@
+                     if (wakeDetector != null) wakeDetector.reset();
+                     if (dreamDetector != null) dreamDetector.reset();
+                     if (timeDetector != null) timeDetector.reset();
++                    if (alarmDetector != null) alarmDetector.reset();
+                     DiagnosticsStore.record(this, DiagnosticsStore.ACOUSTIC_MATCH,
+                             "самостоятельная команда выключения · " + stopCandidate.length + " отсчётов",
+                             0L, MODE_WAITING);
+@@ -611,10 +673,32 @@
+                     // candidate must not be discarded before Google confirms the actual words.
+                     wakeArmed = false;
+                     if (wakeDetector != null) wakeDetector.reset();
++                    if (alarmDetector != null) alarmDetector.reset();
+                     DiagnosticsStore.record(this, DiagnosticsStore.ACOUSTIC_MATCH,
+                             "самостоятельная команда времени · " + timeCandidate.length + " отсчётов",
+                             0L, MODE_WAITING);
+                     startTimeTextVerification(timeCandidate);
++                    return;
++                }
++            }
++        }
++
++        if (alarmDetector != null) {
++            boolean alarmMatched = alarmDetector.accept(buffer, count);
++            alarmDetector.consumeCandidateFinished();
++            if (alarmMatched) {
++                short[] alarmCandidate = alarmDetector.consumeMatchedCandidate();
++                if (alarmCandidate != null && alarmCandidate.length > 0
++                        && WakeTemplateStore.candidateLooksLikeAlarm(this, alarmCandidate)) {
++                    wakeArmed = false;
++                    if (wakeDetector != null) wakeDetector.reset();
++                    if (dreamDetector != null) dreamDetector.reset();
++                    if (timeDetector != null) timeDetector.reset();
++                    if (stopDetector != null) stopDetector.reset();
++                    DiagnosticsStore.record(this, DiagnosticsStore.ACOUSTIC_MATCH,
++                            "самостоятельная команда будильника · " + alarmCandidate.length + " отсчётов",
++                            0L, MODE_WAITING);
++                    startAlarmTextVerification(alarmCandidate);
+                     return;
+                 }
+             }
+@@ -630,6 +714,7 @@
+                     if (wakeDetector != null) wakeDetector.reset();
+                     if (timeDetector != null) timeDetector.reset();
+                     if (stopDetector != null) stopDetector.reset();
++                    if (alarmDetector != null) alarmDetector.reset();
+                     DiagnosticsStore.record(this, DiagnosticsStore.ACOUSTIC_MATCH,
+                             "самостоятельная команда сна · " + dreamCandidate.length + " отсчётов",
+                             0L, MODE_WAITING);
+@@ -647,6 +732,7 @@
+             if (dreamDetector != null) dreamDetector.reset();
+             if (timeDetector != null) timeDetector.reset();
+             if (stopDetector != null) stopDetector.reset();
++            if (alarmDetector != null) alarmDetector.reset();
+             DiagnosticsStore.record(this, DiagnosticsStore.ACOUSTIC_MATCH,
+                     "кандидат " + (candidate == null ? 0 : candidate.length) + " отсчётов",
+                     0L, MODE_WAITING);
+@@ -760,6 +846,37 @@
+                                 matched, text, "", custom.matchedAnchor));
+                     }
+ 
++                    @Override public void onError(String message) {
++                        if (wakeVerificationGeneration.get() != generation || !running.get()) return;
++                        wakeVerificationResult.set(new WakeVerificationResult(false, "", message, ""));
++                    }
++                });
++    }
++
++    private void startAlarmTextVerification(short[] candidate) {
++        verificationPurpose = VerificationPurpose.ALARM;
++        wakeCandidateDreamHint = false;
++        clearWakeVerificationBuffer();
++        wakeVerificationResult.set(null);
++        final long generation = wakeVerificationGeneration.incrementAndGet();
++        wakeVerificationStartedAt = System.currentTimeMillis();
++        wakeVerificationInProgress.set(true);
++        setMode(MODE_VERIFYING);
++        vibratePattern(new long[]{0, 70});
++        updateNotification("Команда будильника услышана · проверяю…");
++        DiagnosticsStore.record(this, DiagnosticsStore.VERIFY_START,
++                "голосовой будильник: " + alarmLabel, 0L, MODE_VERIFYING);
++

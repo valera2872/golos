@@ -1,0 +1,147 @@
++    private static final String KEY_ALARM_THRESHOLD = "acoustic_alarm_threshold";
+ 
+     private WakeTemplateStore() {}
+ 
+@@ -138,11 +140,18 @@
+         return dir;
+     }
+ 
++    public static File alarmDirectory(Context context) {
++        File dir = new File(context.getFilesDir(), "wake_templates_alarm_v1");
++        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Не удалось создать папку голосового будильника");
++        return dir;
++    }
++
+     public static synchronized int count(Context context) { return pcmCount(directory(context)); }
+     public static synchronized int fastCount(Context context) { return pcmCount(fastDirectory(context)); }
+     public static synchronized int dreamCount(Context context) { return pcmCount(dreamDirectory(context)); }
+     public static synchronized int timeCount(Context context) { return pcmCount(timeDirectory(context)); }
+     public static synchronized int stopCount(Context context) { return pcmCount(stopDirectory(context)); }
++    public static synchronized int alarmCount(Context context) { return pcmCount(alarmDirectory(context)); }
+ 
+     private static int pcmCount(File directory) {
+         File[] files = directory.listFiles((d, n) -> n.endsWith(".pcm"));
+@@ -174,6 +183,11 @@
+         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_STOP_THRESHOLD).apply();
+     }
+ 
++    public static synchronized void clearAlarm(Context context) {
++        deleteAll(alarmDirectory(context));
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_ALARM_THRESHOLD).apply();
++    }
++
+     private static void deleteAll(File directory) {
+         File[] files = directory.listFiles();
+         if (files != null) for (File file : files) file.delete();
+@@ -197,6 +211,10 @@
+ 
+     public static synchronized int saveNextStop(Context context, short[] pcm) throws IOException {
+         return saveNext(stopDirectory(context), "stop", pcm);
++    }
++
++    public static synchronized int saveNextAlarm(Context context, short[] pcm) throws IOException {
++        return saveNext(alarmDirectory(context), "alarm", pcm);
+     }
+ 
+     private static int saveNext(File directory, String prefix, short[] pcm) throws IOException {
+@@ -239,6 +257,10 @@
+ 
+     public static synchronized List<short[]> loadStopForDetection(Context context) throws IOException {
+         return loadDirectory(stopDirectory(context));
++    }
++
++    public static synchronized List<short[]> loadAlarmForDetection(Context context) throws IOException {
++        return loadDirectory(alarmDirectory(context));
+     }
+ 
+     public static synchronized boolean candidateLooksLikeDream(Context context, short[] candidate) {
+@@ -265,6 +287,7 @@
+             others.addAll(loadDirectory(fastDirectory(context)));
+             others.addAll(loadDirectory(dreamDirectory(context)));
+             others.addAll(loadDirectory(stopDirectory(context)));
++            others.addAll(loadDirectory(alarmDirectory(context)));
+             double timeBest = bestDistance(candidate, times);
+             double otherBest = bestDistance(candidate, others);
+             return Double.isFinite(timeBest)
+@@ -283,10 +306,31 @@
+             others.addAll(loadDirectory(fastDirectory(context)));
+             others.addAll(loadDirectory(dreamDirectory(context)));
+             others.addAll(loadDirectory(timeDirectory(context)));
++            others.addAll(loadDirectory(alarmDirectory(context)));
+             double stopBest = bestDistance(candidate, stops);
+             double otherBest = bestDistance(candidate, others);
+             return Double.isFinite(stopBest)
+                     && (!Double.isFinite(otherBest) || stopBest <= otherBest * 0.90);
++        } catch (Exception ignored) {
++            return false;
++        }
++    }
++
++
++    /** Strictly separates the independent alarm trigger from the other night commands. */
++    public static synchronized boolean candidateLooksLikeAlarm(Context context, short[] candidate) {
++        try {
++            List<short[]> alarms = loadDirectory(alarmDirectory(context));
++            if (alarms.size() < REQUIRED_ALARM_SAMPLES || candidate == null || candidate.length == 0) return false;
++            List<short[]> others = loadDirectory(directory(context));
++            others.addAll(loadDirectory(fastDirectory(context)));
++            others.addAll(loadDirectory(dreamDirectory(context)));
++            others.addAll(loadDirectory(timeDirectory(context)));
++            others.addAll(loadDirectory(stopDirectory(context)));
++            double alarmBest = bestDistance(candidate, alarms);
++            double otherBest = bestDistance(candidate, others);
++            return Double.isFinite(alarmBest)
++                    && (!Double.isFinite(otherBest) || alarmBest <= otherBest * 0.92);
+         } catch (Exception ignored) {
+             return false;
+         }
+@@ -339,6 +383,14 @@
+         return threshold;
+     }
+ 
++    public static synchronized double calibrateAlarm(Context context) throws IOException {
++        List<short[]> samples = loadAlarmForDetection(context);
++        double threshold = AudioFingerprint.calibratedThreshold(samples);
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
++                .putFloat(KEY_ALARM_THRESHOLD, (float) threshold).apply();
++        return threshold;
++    }
++
+     public static double threshold(Context context) {
+         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+         return prefs.getFloat(KEY_THRESHOLD, 0.95f);
+@@ -357,6 +409,11 @@
+     public static double stopThreshold(Context context) {
+         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+         return prefs.getFloat(KEY_STOP_THRESHOLD, 0.86f);
++    }
++
++    public static double alarmThreshold(Context context) {
++        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
++        return prefs.getFloat(KEY_ALARM_THRESHOLD, 0.88f);
+     }
+ 
+     public static short[] readPcm(File file) throws IOException {
+--- a/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
++++ b/app/src/main/java/com/quietdiary/app/WakeWordTrainer.java
+@@ -31,7 +31,7 @@
+ 
+     public static boolean isBusy() { return BUSY.get(); }
+ 
+-    private enum Kind { REGULAR, FAST, DREAM, TIME, STOP }
++    private enum Kind { REGULAR, FAST, DREAM, TIME, STOP, ALARM }
+ 
+     public static void recordSample(Context context, Listener listener) {
+         record(context, Kind.REGULAR, listener);
+@@ -51,6 +51,10 @@
+ 
+     public static void recordStopSample(Context context, Listener listener) {
+         record(context, Kind.STOP, listener);
++    }
++
++    public static void recordAlarmSample(Context context, Listener listener) {
++        record(context, Kind.ALARM, listener);
+     }
+ 
+     private static void record(Context context, Kind kind, Listener listener) {
+@@ -141,6 +145,9 @@
