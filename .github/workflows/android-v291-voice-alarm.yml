@@ -1,4 +1,4 @@
-name: Build Somnori 0.29.1 voice alarm
+name: Build Somnori 0.29.2 alarm fix + dashboard
 
 on:
   pull_request:
@@ -53,28 +53,12 @@ jobs:
           grep -q 'RussianAlarmCommandParser.parse' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'VoiceUtteranceCollector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
 
-          # Recognition reliability baseline must remain intact.
           grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
           ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'alarmDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
           grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import re, xml.etree.ElementTree as ET
-          root = Path('app/src/main')
-          for p in (root/'res').rglob('*.xml'):
-              ET.parse(p)
-          settings=(root/'res/layout/activity_settings.xml').read_text(encoding='utf-8')
-          assert 'ГОЛОСОВОЙ БУДИЛЬНИК · ЭКСПЕРИМЕНТ' in settings
-          assert 'Будильник без касания телефона' in settings
-          blocks=re.findall(r'<com\.google\.android\.material\.button\.MaterialButton\b.*?/>', settings, re.S)
-          for block in blocks:
-              assert not re.search(r'android:layout_height="\d+dp"', block), 'fixed-height button regression'
-          print('Somnori 0.29.1 static guards: OK')
-          PY
 
       - name: Preserve Somnori 0.29 master audio slots and library UI
         shell: bash
@@ -109,6 +93,51 @@ jobs:
           grep -q 'R.raw.music_calm_energy, "Мягкая природа"' app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java
           test -s app/src/main/res/raw/nature_forest.mp3
 
+      - name: Apply Somnori 0.29.2 alarm reliability and dashboard patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d buildsrc/v292/patch.gz.b64 | gzip -dc > /tmp/v292.patch
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v292.patch
+
+          grep -q 'versionCode = 2902' app/build.gradle.kts
+          grep -q 'versionName = "0.29.2"' app/build.gradle.kts
+          grep -q 'transcribeShortCommandSamples' app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt
+          grep -q 'END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/VoiceUtteranceCollector.java
+          grep -q 'alarmDialogAttempts' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q '1232' app/src/test/java/com/quietdiary/app/RussianAlarmCommandParserTest.java
+          grep -q 'dashboardNightButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'dashboardAlarmVoiceButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'dashboardPracticeButton' app/src/main/res/layout/activity_main.xml
+          grep -q 'Что вы хотите сделать?' app/src/main/res/layout/activity_main.xml
+          grep -q 'ГОЛОС SOMNORI' app/src/main/res/layout/activity_settings.xml
+          grep -q 'focus_alarm_voice' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+
+          # Frozen recognition baseline still must not move.
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'dreamDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'alarmDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root=Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          main=(root/'res/layout/activity_main.xml').read_text(encoding='utf-8')
+          for expected in ['БЫСТРАЯ ЗАПИСЬ','НОЧЬ БЕЗ РУК','БУДИЛЬНИК','ПЕРЕД СНОМ','Как работает бесконтактная ночь']:
+              assert expected in main, expected
+          for p in (root/'res/layout').rglob('*.xml'):
+              text=p.read_text(encoding='utf-8')
+              for block in re.findall(r'<com\.google\.android\.material\.button\.MaterialButton\b.*?/>', text, re.S):
+                  assert not re.search(r'android:layout_height="\d+dp"', block), f'fixed-height button: {p.name}'
+          print('Somnori 0.29.2 XML + dashboard guards: OK')
+          PY
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -130,18 +159,18 @@ jobs:
           for entry in res/raw/music_sea_harp.mp3 res/raw/music_calm_energy.mp3 res/raw/music_quiet_meditation.mp3 res/raw/nature_forest.mp3; do
             unzip -l "$APK" "$entry" | grep -q "$entry"
           done
-          cp "$APK" Somnori-0.29.1-voice-alarm-debug.apk
+          cp "$APK" Somnori-0.29.2-alarm-dashboard-debug.apk
           cd buildsrc
-          zip -qr ../Somnori-0.29.1-voice-alarm-source.zip quiet-diary
+          zip -qr ../Somnori-0.29.2-alarm-dashboard-source.zip quiet-diary
 
       - uses: actions/upload-artifact@v4
         with:
-          name: somnori-0.29.1-voice-alarm-debug-apk
-          path: Somnori-0.29.1-voice-alarm-debug.apk
+          name: somnori-0.29.2-alarm-dashboard-debug-apk
+          path: Somnori-0.29.2-alarm-dashboard-debug.apk
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
         with:
-          name: somnori-0.29.1-voice-alarm-source
-          path: Somnori-0.29.1-voice-alarm-source.zip
+          name: somnori-0.29.2-alarm-dashboard-source
+          path: Somnori-0.29.2-alarm-dashboard-source.zip
           retention-days: 14
