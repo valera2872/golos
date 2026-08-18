@@ -54,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 buildsrc/v299/apply_v299.py
+          python3 buildsrc/v299/fix_hero_title.py
           cd buildsrc/quiet-diary
           grep -q 'versionCode = 2909' app/build.gradle.kts
           grep -q 'versionName = "0.29.9"' app/build.gradle.kts
@@ -61,6 +62,8 @@ jobs:
           grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'configureSomnoriVoice' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'SomnoriVoiceTools.compactTime' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'android:text="БЕСКОНТАКТНЫЙ"' app/src/main/res/layout/activity_main.xml
+          grep -q 'android:text="Ночной помощник"' app/src/main/res/layout/activity_main.xml
           ! grep -q 'somnori_practice_scene' app/src/main/res/layout/activity_main.xml
           ! grep -q 'somnori_sleep_scene' app/src/main/res/layout/activity_main.xml
           grep -q 'somnori_assistant_scene' app/src/main/res/layout/activity_main.xml
