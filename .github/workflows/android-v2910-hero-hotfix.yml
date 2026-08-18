@@ -54,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 buildsrc/v299/apply_v299.py
+          python3 buildsrc/v2910/apply_voice_time_phrase.py
           python3 buildsrc/v2910/apply_v2910.py
           cd buildsrc/quiet-diary
           grep -q 'versionCode = 2910' app/build.gradle.kts
@@ -62,6 +63,7 @@ jobs:
           grep -q 'else ensurePermissionsAndStart();' app/src/main/java/com/quietdiary/app/MainActivity.java
           grep -q 'android:minHeight="246dp"' app/src/main/res/layout/activity_main.xml
           grep -q 'android:layout_height="wrap_content"' app/src/main/res/layout/activity_main.xml
+          grep -q 'тринадцать часов семнадцать минут' app/src/test/java/com/quietdiary/app/SomnoriVoiceToolsTest.java
           ! grep -q 'somnori_practice_scene' app/src/main/res/layout/activity_main.xml
           ! grep -q 'somnori_sleep_scene' app/src/main/res/layout/activity_main.xml
           sha256sum -c /tmp/v2910-frozen-core.sha256
