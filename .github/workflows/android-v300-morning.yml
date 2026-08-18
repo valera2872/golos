@@ -54,6 +54,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 buildsrc/v299/apply_v299.py
+          python3 buildsrc/v299/fix_hero_title.py
           python3 buildsrc/v300/apply_v300.py
           cd buildsrc/quiet-diary
           grep -q 'versionCode = 3000' app/build.gradle.kts
@@ -66,6 +67,8 @@ jobs:
           grep -q 'dashboardMorningCard' app/src/main/res/layout/activity_main.xml
           grep -q 'morningEntriesContainer' app/src/main/res/layout/activity_morning.xml
           grep -q 'MorningActivity' app/src/main/AndroidManifest.xml
+          grep -q 'android:text="БЕСКОНТАКТНЫЙ"' app/src/main/res/layout/activity_main.xml
+          grep -q 'android:text="Ночной помощник"' app/src/main/res/layout/activity_main.xml
           ! grep -q 'somnori_practice_scene' app/src/main/res/layout/activity_main.xml
           ! grep -q 'somnori_sleep_scene' app/src/main/res/layout/activity_main.xml
           sha256sum -c /tmp/v300-frozen-core.sha256
