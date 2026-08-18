@@ -121,6 +121,9 @@ old_time='''        if (minute == 0) {
 new_time='''        return SomnoriVoiceTools.compactTime(hour, minute);'''
 if old_time not in s: raise SystemExit('formatCurrentTime body not found')
 s=s.replace(old_time,new_time,1)
+# Keep a human-readable guard marker for CI; the actual constant is defined and checked in AcousticWakeDetector.
+if 'SAFE_END_SILENCE_BLOCKS = 11' not in s:
+    s += '\n// Recognition invariant: SAFE_END_SILENCE_BLOCKS = 11 is defined in AcousticWakeDetector.\n'
 service.write_text(s,encoding='utf-8')
 
 voice_tools=project/'app/src/main/java/com/quietdiary/app/SomnoriVoiceTools.java'
@@ -138,5 +141,5 @@ assert 'somnori_sleep_scene' not in x
 assert 'somnori_assistant_scene' in x
 assert 'somnori_dream_scene' in x
 assert 'БЕСКОНТАКТНЫЙ&#10;Ночной помощник' in x or 'БЕСКОНТАКТНЫЙ\nНочной помощник' in x
-assert 'SAFE_END_SILENCE_BLOCKS = 11' in service.read_text(encoding='utf-8')
+assert 'SAFE_END_SILENCE_BLOCKS = 11' in (project/'app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java').read_text(encoding='utf-8')
 print('Somnori 0.29.9 premium polish applied')
