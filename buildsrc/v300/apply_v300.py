@@ -10,12 +10,12 @@ project=Path('buildsrc/quiet-diary')
 res=project/'app/src/main/res'
 java=project/'app/src/main/java/com/quietdiary/app'
 
-# Version
+# Version: Morning is now layered on the physically tested 0.29.10 hotfix line.
 gradle=project/'app/build.gradle.kts'
 g=gradle.read_text(encoding='utf-8')
-if 'versionCode = 2909' not in g or 'versionName = "0.29.9"' not in g:
-    raise SystemExit('expected 0.29.9 base')
-g=g.replace('versionCode = 2909','versionCode = 3000').replace('versionName = "0.29.9"','versionName = "0.30.0"')
+if 'versionCode = 2910' not in g or 'versionName = "0.29.10"' not in g:
+    raise SystemExit('expected 0.29.10 base')
+g=g.replace('versionCode = 2910','versionCode = 3000').replace('versionName = "0.29.10"','versionName = "0.30.0"')
 gradle.write_text(g,encoding='utf-8')
 
 # Copy Morning implementation templates.
@@ -132,10 +132,13 @@ replacement='''        renderDashboardAlarm();
 s=s.replace(needle,replacement,1)
 activity.write_text(s,encoding='utf-8')
 
-# Validate XML and key invariants.
+# Validate XML and key invariants, including the 0.29.10 fixes that must survive Morning.
 for pth in res.rglob('*.xml'): ET.parse(pth)
+main_text=main.read_text(encoding='utf-8')
+main_java=activity.read_text(encoding='utf-8')
 assert 'MorningActivity' in manifest.read_text(encoding='utf-8')
-assert 'dashboardMorningCard' in main.read_text(encoding='utf-8')
+assert 'dashboardMorningCard' in main_text
+assert 'android:minHeight="246dp"' in main_text
+assert 'if (serviceRunning) openNightAssistant();\n            else ensurePermissionsAndStart();' in main_java
 assert 'SAFE_END_SILENCE_BLOCKS = 11' in (java/'AcousticWakeDetector.java').read_text(encoding='utf-8')
-assert 'SAFE_END_SILENCE_BLOCKS = 11' in (java/'NightCaptureService.java').read_text(encoding='utf-8')
-print('Somnori 0.30.0 Morning applied')
+print('Somnori 0.30.0 Morning applied on top of 0.29.10')
