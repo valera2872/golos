@@ -49,19 +49,21 @@ jobs:
             app/src/main/java/com/quietdiary/app/NightProgramService.java \
             > /tmp/v300-frozen-core.sha256
 
-      - name: Apply 0.29.9 then 0.30 Morning
+      - name: Apply 0.29.10 fixes then 0.30 Morning
         shell: bash
         run: |
           set -euo pipefail
           python3 buildsrc/v299/apply_v299.py
           python3 buildsrc/v299/fix_hero_title.py
+          python3 buildsrc/v2910/apply_v2910.py
+          python3 buildsrc/v2910/apply_voice_time_phrase.py
           python3 buildsrc/v300/apply_v300.py
           cd buildsrc/quiet-diary
           grep -q 'versionCode = 3000' app/build.gradle.kts
           grep -q 'versionName = "0.30.0"' app/build.gradle.kts
           grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
-          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/NightCaptureService.java
           grep -q 'configureSomnoriVoice' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'тринадцать часов семнадцать минут' app/src/test/java/com/quietdiary/app/SomnoriVoiceToolsTest.java
           grep -q 'class MorningActivity' app/src/main/java/com/quietdiary/app/MorningActivity.java
           grep -q 'latestCompletedNight' app/src/main/java/com/quietdiary/app/MorningTools.java
           grep -q 'dashboardMorningCard' app/src/main/res/layout/activity_main.xml
@@ -69,6 +71,8 @@ jobs:
           grep -q 'MorningActivity' app/src/main/AndroidManifest.xml
           grep -q 'android:text="БЕСКОНТАКТНЫЙ"' app/src/main/res/layout/activity_main.xml
           grep -q 'android:text="Ночной помощник"' app/src/main/res/layout/activity_main.xml
+          grep -q 'android:minHeight="246dp"' app/src/main/res/layout/activity_main.xml
+          grep -q 'else ensurePermissionsAndStart();' app/src/main/java/com/quietdiary/app/MainActivity.java
           ! grep -q 'somnori_practice_scene' app/src/main/res/layout/activity_main.xml
           ! grep -q 'somnori_sleep_scene' app/src/main/res/layout/activity_main.xml
           sha256sum -c /tmp/v300-frozen-core.sha256
@@ -93,16 +97,16 @@ jobs:
           set -euo pipefail
           APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
-          cp "$APK" Somnori-0.30.0-morning-audio-slots-debug.apk
-          cd buildsrc && zip -qr ../Somnori-0.30.0-morning-source.zip quiet-diary
+          cp "$APK" Somnori-0.30.0-morning-v2910-fixes-audio-slots-debug.apk
+          cd buildsrc && zip -qr ../Somnori-0.30.0-morning-v2910-fixes-source.zip quiet-diary
 
       - uses: actions/upload-artifact@v4
         with:
-          name: somnori-0.30.0-morning-audio-slots-debug-apk
-          path: Somnori-0.30.0-morning-audio-slots-debug.apk
+          name: somnori-0.30.0-morning-v2910-fixes-audio-slots-debug-apk
+          path: Somnori-0.30.0-morning-v2910-fixes-audio-slots-debug.apk
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: somnori-0.30.0-morning-source
-          path: Somnori-0.30.0-morning-source.zip
+          name: somnori-0.30.0-morning-v2910-fixes-source
+          path: Somnori-0.30.0-morning-v2910-fixes-source.zip
           retention-days: 14
