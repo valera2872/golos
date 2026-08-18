@@ -1,0 +1,131 @@
+name: Build Somnori 0.29.8 text fit
+
+on:
+  pull_request:
+    branches: [ agent/v0-29-1-voice-alarm ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.29.6 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v296-premium-night-console.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.29.5 project',
+              'Apply Somnori 0.29.6 premium visuals and night console',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              path = Path(f'/tmp/v298-base-{n}.sh')
+              path.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(path)], check=True)
+          PY
+
+          cd buildsrc/quiet-diary
+          sha256sum \
+            app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java \
+            app/src/main/java/com/quietdiary/app/NightCaptureService.java \
+            app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java \
+            app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt \
+            app/src/main/java/com/quietdiary/app/NightCommandRouter.java \
+            app/src/main/java/com/quietdiary/app/WakeTemplateStore.java \
+            app/src/main/java/com/quietdiary/app/NightAssistantActivity.java \
+            app/src/main/java/com/quietdiary/app/SettingsActivity.java \
+            app/src/main/java/com/quietdiary/app/CouePracticeService.java \
+            app/src/main/java/com/quietdiary/app/NightProgramService.java \
+            > /tmp/v298-frozen-core.sha256
+
+      - name: Apply 0.29.7 concept home and 0.29.8 text fit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v297/apply_concept_home.py
+          python3 buildsrc/v297/strip_unsupported_insets.py
+          python3 buildsrc/v298/apply_text_fit.py
+
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 2908' app/build.gradle.kts
+          grep -q 'versionName = "0.29.8"' app/build.gradle.kts
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          grep -q 'dashboardNightButton.setText(serviceRunning ? "Открыть" : "Включить")' app/src/main/java/com/quietdiary/app/MainActivity.java
+          grep -q 'trainingControlsRecovery' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'Микрофон готов · жду команду' app/src/main/java/com/quietdiary/app/NightAssistantActivity.java
+          grep -q 'somnori_mini_status_pill' app/src/main/res/layout/activity_main.xml
+          ! grep -A3 -B1 'dashboardPracticeStatus' app/src/main/res/layout/activity_main.xml | grep -q 'paddingEnd="82dp"'
+          ! grep -A3 -B1 'dashboardBeforeSleepStatus' app/src/main/res/layout/activity_main.xml | grep -q 'paddingEnd="82dp"'
+
+          # UI-only iteration: all night/recognition services stay byte-identical.
+          sha256sum -c /tmp/v298-frozen-core.sha256
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and placeholder APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare 0.29.8 audio-slot artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          for entry in \
+            res/raw/music_sea_harp.mp3 \
+            res/raw/music_calm_energy.mp3 \
+            res/raw/music_quiet_meditation.mp3 \
+            res/raw/nature_forest.mp3; do
+            unzip -l "$APK" "$entry" | grep -q "$entry"
+          done
+          cp "$APK" Somnori-0.29.8-text-fit-audio-slots-debug.apk
+          cat > Somnori-0.29.8-master-audio-manifest.txt <<'EOF'
+          Final local injection must contain these exact masters:
+          music_sea_harp.mp3         98fa11c74b316deb9bd72905ccb0da1efb2feb7774d5bc79f8f2c2b47d78b4f0
+          music_calm_energy.mp3      02a6e69b3d8304cea5b185e94fe1c8be44ef07e706f4fb2544342377e4fb2d41
+          music_quiet_meditation.mp3 76527a75f5dcb011418e543c27c86143532208e9695aa74344d1050fabb5ad27
+          nature_forest.mp3          1fd14070434bf2e2639d62b840a040df159cebb52b0525dc3cb602fa3ec081cc
+          Signer cert SHA-256 required: efef6ef129a00ead90397aa894e27131eaeac6f60808393c92628756cbf01c14
+          EOF
+          cd buildsrc
+          zip -qr ../Somnori-0.29.8-text-fit-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.8-text-fit-audio-slots-debug-apk
+          path: |
+            Somnori-0.29.8-text-fit-audio-slots-debug.apk
+            Somnori-0.29.8-master-audio-manifest.txt
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.8-text-fit-source
+          path: Somnori-0.29.8-text-fit-source.zip
+          retention-days: 14

@@ -1,0 +1,1 @@
+Target: reproduce the approved Somnori concept as closely as practical on real Android screens: compact header and typography, clean image/text separation, concept-like cards, no Night Core changes.
