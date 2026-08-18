@@ -60,6 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 buildsrc/v297/apply_concept_home.py
+          python3 buildsrc/v297/strip_unsupported_insets.py
 
           cd buildsrc/quiet-diary
           grep -q 'versionCode = 2907' app/build.gradle.kts
@@ -74,6 +75,10 @@ jobs:
           grep -q 'somnori_practice_scene' app/src/main/res/layout/activity_main.xml
           grep -q 'somnori_sleep_scene' app/src/main/res/layout/activity_main.xml
           grep -q 'somnori_dream_scene' app/src/main/res/layout/activity_main.xml
+          ! grep -q 'insetTop' app/src/main/res/layout/activity_main.xml
+          ! grep -q 'insetBottom' app/src/main/res/layout/activity_main.xml
+          ! grep -q 'insetTop' app/src/main/res/layout/view_bottom_navigation.xml
+          ! grep -q 'insetBottom' app/src/main/res/layout/view_bottom_navigation.xml
           ! grep -q '<bitmap' app/src/main/res/drawable/somnori_assistant_card_background.xml
           ! grep -q '<bitmap' app/src/main/res/drawable/somnori_practice_card_background.xml
           ! grep -q '<bitmap' app/src/main/res/drawable/somnori_sleep_card_background.xml
