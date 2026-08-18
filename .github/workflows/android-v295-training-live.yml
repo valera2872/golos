@@ -1,0 +1,138 @@
+name: Build Somnori 0.29.5 training recovery + live night status
+
+on:
+  pull_request:
+    branches: [ agent/v0-29-1-voice-alarm ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.29.4 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v294-home-cards.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.29.3 project',
+              'Fix Practice and Before Sleep card visibility',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              path = Path(f'/tmp/v295-base-{n}.sh')
+              path.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(path)], check=True)
+          PY
+          cd buildsrc/quiet-diary
+          sha256sum \
+            app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java \
+            app/src/main/java/com/quietdiary/app/NightCaptureService.java \
+            app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java > /tmp/v295-frozen-recognition.sha256
+
+      - name: Apply Somnori 0.29.5 UI reliability patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum buildsrc/v295/patch.gz.b64 | awk '{print $1}')" = "0286ef6af85dca53afa08cd61ffa8a1a43cd5780757de490d5e857ed718e4b35"
+          base64 -d buildsrc/v295/patch.gz.b64 | gzip -dc > /tmp/v295.patch
+          test "$(sha256sum /tmp/v295.patch | awk '{print $1}')" = "c93bc06be56b89b2e90b1981337433bde47880c4b91b7aacab46e08bcbf70994"
+          cd buildsrc/quiet-diary
+          patch -p1 < /tmp/v295.patch
+
+          grep -q 'versionCode = 2905' app/build.gradle.kts
+          grep -q 'versionName = "0.29.5"' app/build.gradle.kts
+          grep -q 'trainingControlsRecovery' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'scheduleTrainingControlsRecovery(250L)' app/src/main/java/com/quietdiary/app/SettingsActivity.java
+          grep -q 'nightLivePanel.setVisibility(serviceRunning ? View.VISIBLE : View.GONE)' app/src/main/java/com/quietdiary/app/MainActivity.java
+          grep -q 'Микрофон готов · жду команду' app/src/main/java/com/quietdiary/app/MainActivity.java
+          grep -q 'android:id="@+id/nightLivePanel"' app/src/main/res/layout/activity_main.xml
+          grep -q 'ВАШИ КОМАНДЫ' app/src/main/res/layout/activity_main.xml
+          grep -q 'Сейчас рано говорить' app/src/main/java/com/quietdiary/app/MainActivity.java
+
+          # Night recognition/alarm core must stay byte-identical to 0.29.4/0.29.2.
+          sha256sum -c /tmp/v295-frozen-recognition.sha256
+          grep -q 'SAFE_END_SILENCE_BLOCKS = 11' app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java
+          ! grep -q 'transcribeSamplesFast' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'alarmDetector = new AcousticWakeDetector' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'private static final long PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/CouePracticeService.java
+          grep -q 'private static final long COUE_PAUSE_MS = 3000L;' app/src/main/java/com/quietdiary/app/NightProgramService.java
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, collections, xml.etree.ElementTree as ET
+          root = Path('app/src/main/res')
+          for p in root.rglob('*.xml'):
+              ET.parse(p)
+          main = (root/'layout/activity_main.xml').read_text(encoding='utf-8')
+          ids = re.findall(r'android:id="@\+id/([^\"]+)"', main)
+          duplicates = [k for k,v in collections.Counter(ids).items() if v > 1]
+          assert not duplicates, duplicates
+          for expected in ['nightLivePanel', 'nightModeBadge', 'serviceStateTitle', 'serviceStatus',
+                           'verificationCountdown', 'verificationProgress', 'nightPhraseSummary',
+                           'recordingControls', 'saveCurrentButton', 'cancelCurrentButton',
+                           'dashboardPracticeCard', 'dashboardBeforeSleepCard']:
+              assert expected in ids, expected
+          live_pos = main.index('android:id="@+id/nightLivePanel"')
+          live_block = main[live_pos:live_pos+900]
+          assert 'android:visibility="gone"' in live_block
+          for card_id in ('dashboardPracticeCard', 'dashboardBeforeSleepCard'):
+              pos = main.index(f'android:id="@+id/{card_id}"')
+              block = main[pos:pos+420]
+              assert 'android:layout_height="wrap_content"' in block, card_id
+              assert 'android:minHeight="178dp"' in block, card_id
+          settings = Path('app/src/main/java/com/quietdiary/app/SettingsActivity.java').read_text(encoding='utf-8')
+          assert 'if (!enabled) scheduleTrainingControlsRecovery(250L);' in settings
+          assert 'if (WakeWordTrainer.isBusy() || WakePhraseTester.isBusy())' in settings
+          print('Somnori 0.29.5 UI reliability guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          for entry in res/raw/music_sea_harp.mp3 res/raw/music_calm_energy.mp3 res/raw/music_quiet_meditation.mp3 res/raw/nature_forest.mp3; do
+            unzip -l "$APK" "$entry" | grep -q "$entry"
+          done
+          cp "$APK" Somnori-0.29.5-training-live-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.29.5-training-live-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.5-training-live-debug-apk
+          path: Somnori-0.29.5-training-live-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.29.5-training-live-source
+          path: Somnori-0.29.5-training-live-source.zip
+          retention-days: 14
