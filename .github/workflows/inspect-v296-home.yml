@@ -1,0 +1,51 @@
+name: Inspect exact Somnori 0.29.6 home
+
+on:
+  pull_request:
+    branches: [ agent/v0-29-1-voice-alarm ]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.29.6 project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v296-premium-night-console.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.29.5 project',
+              'Apply Somnori 0.29.6 premium visuals and night console',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              path = Path(f'/tmp/v296-inspect-{n}.sh')
+              path.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(path)], check=True)
+          PY
+
+      - name: Print navigation implementation
+        shell: bash
+        run: |
+          ROOT=buildsrc/quiet-diary/app/src/main
+          echo '===== UI_NAVIGATION_BEGIN ====='
+          cat "$ROOT/java/com/quietdiary/app/UiNavigation.java"
+          echo '===== UI_NAVIGATION_END ====='
+          echo '===== MAIN_NAV_BINDING_BEGIN ====='
+          sed -n '120,245p' "$ROOT/java/com/quietdiary/app/MainActivity.java"
+          echo '===== MAIN_NAV_BINDING_END ====='
+          echo '===== NAV_DRAWABLE_BEGIN ====='
+          cat "$ROOT/res/drawable/nav_background.xml"
+          echo '===== NAV_DRAWABLE_END ====='
