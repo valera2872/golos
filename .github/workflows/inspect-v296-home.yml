@@ -36,12 +36,24 @@ jobs:
               subprocess.run(['bash', str(path)], check=True)
           PY
 
-      - name: Print home layout
+      - name: Print home layout and visual resources
         shell: bash
         run: |
+          ROOT=buildsrc/quiet-diary/app/src/main/res
           echo '===== ACTIVITY_MAIN_XML_BEGIN ====='
-          cat buildsrc/quiet-diary/app/src/main/res/layout/activity_main.xml
+          cat "$ROOT/layout/activity_main.xml"
           echo '===== ACTIVITY_MAIN_XML_END ====='
+          echo '===== BOTTOM_NAV_BEGIN ====='
+          cat "$ROOT/layout/view_bottom_navigation.xml"
+          echo '===== BOTTOM_NAV_END ====='
+          for f in somnori_brand_header_background somnori_assistant_card_background somnori_practice_card_background somnori_sleep_card_background somnori_dream_card_background somnori_alarm_banner_background somnori_tonight_card_background; do
+            echo "===== ${f}_BEGIN ====="
+            cat "$ROOT/drawable/${f}.xml"
+            echo "===== ${f}_END ====="
+          done
+          echo '===== SCENE_ASSETS ====='
+          file "$ROOT"/drawable-nodpi/somnori_*.webp
+          identify "$ROOT"/drawable-nodpi/somnori_*.webp 2>/dev/null || true
           echo '===== MAIN_ACTIVITY_REFS_BEGIN ====='
           grep -nE 'dashboard|somnori|nightLivePanel|openNightAssistant|bottom' buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app/MainActivity.java || true
           echo '===== MAIN_ACTIVITY_REFS_END ====='
