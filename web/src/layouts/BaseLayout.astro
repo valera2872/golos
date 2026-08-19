@@ -1,7 +1,9 @@
 ---
 import '../styles/global.css';
 import '../styles/v2.css';
-import { copy, homePath, localeMeta, locales, type Locale } from '../i18n/site';
+import '../styles/v21.css';
+import { copy, homePath, localeMeta, type Locale } from '../i18n/site';
+import { publicLocales } from '../i18n/public';
 
 interface Alternate { lang: string; href: string }
 
@@ -91,7 +93,7 @@ const softwareSchema = type === 'software' ? {
         <details class="language-switcher">
           <summary aria-label={t.nav.language}><span class="globe">◎</span>{localeMeta[locale].native}<span class="chevron">⌄</span></summary>
           <div class="language-menu">
-            {locales.map((lang) => (
+            {publicLocales.map((lang) => (
               <a class={lang === locale ? 'active' : ''} href={localeMeta[lang].path} lang={lang} hreflang={lang}>
                 <span>{localeMeta[lang].native}</span><b>{localeMeta[lang].label}</b>
               </a>

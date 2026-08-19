@@ -1,18 +1,59 @@
 ---
 import type { SiteCopy } from '../i18n/site';
+import type { PublicLocale } from '../i18n/public';
 
 interface Props {
-  variant: 'night' | 'morning' | 'signs' | 'sleep';
+  variant: 'home' | 'night' | 'morning' | 'signs' | 'sleep';
   copy: SiteCopy['phone'];
+  locale?: PublicLocale;
   class?: string;
 }
 
-const { variant, copy, class: className = '' } = Astro.props;
+const { variant, copy, locale = 'en', class: className = '' } = Astro.props;
+const ru = locale === 'ru';
+const ui = ru ? {
+  dayparts: 'Вечер  •  Ночь  •  Утро', prompt: 'Что вы хотите сделать?', thought: 'Записать мысль', dream: 'Записать сон',
+  contactless: 'БЕСКОНТАКТНЫЙ', assistant: 'Ночной помощник', assistantSub: 'Голосом — без касания телефона', assistantMeta: 'Сны · мысли · время · будильник', ready: 'Готов', on: 'Включить',
+  practices: 'Практики', practiceSub: 'Подготовка к ночи', before: 'Перед сном', beforeSub: 'Звуки и самовнушение', alarm: 'Ночной будильник', dreams: 'Мои сны',
+  morningLabel: 'SOMNORI · УТРО', morningTitle: 'Доброе утро', morningSub: 'Somnori сохранил вашу ночь', morningCount: '2 сна · 1 запись', recall: 'Что-нибудь осталось от сна?', addDream: 'Добавить сон голосом', tonight: 'Этой ночью', noticed: 'Somnori замечает',
+  practiceLabel: 'Практика', soundLabel: 'Звук', intent: 'Намерение запомнить сон', nature: 'Лес ночью', autosuggest: 'Самовнушение', nightReady: 'Ночной режим готов',
+} : {
+  dayparts: 'Evening  •  Night  •  Morning', prompt: 'What do you want to do?', thought: 'Record a thought', dream: 'Record a dream',
+  contactless: 'HANDS-FREE', assistant: 'Night Assistant', assistantSub: 'Voice-first · no phone navigation', assistantMeta: 'Dreams · thoughts · time · alarm', ready: 'Ready', on: 'Turn on',
+  practices: 'Practices', practiceSub: 'Prepare for the night', before: 'Before sleep', beforeSub: 'Sound and autosuggestion', alarm: 'Night alarm', dreams: 'My dreams',
+  morningLabel: 'SOMNORI · MORNING', morningTitle: 'Good morning', morningSub: 'Somnori saved your night', morningCount: '2 dreams · 1 entry', recall: 'Anything else from the dream?', addDream: 'Add dream by voice', tonight: 'This night', noticed: 'Somnori notices',
+  practiceLabel: 'Practice', soundLabel: 'Sound', intent: 'Dream recall intention', nature: 'Forest at night', autosuggest: 'Autosuggestion', nightReady: 'Night mode ready',
+};
 ---
-<div class={`phone-shell ${className}`} aria-hidden="true">
+<div class={`phone-shell ${className}`} aria-hidden="true" data-screenshot-slot={variant}>
   <div class="phone-frame">
     <div class="phone-speaker"></div>
     <div class="phone-screen">
+      {variant === 'home' && (
+        <div class="screen-content app-home-screen">
+          <div class="phone-status"><span>22:48</span><span>◔ 84%</span></div>
+          <div class="app-home-header">
+            <div><p class="screen-wordmark">Somnori</p><small>{ui.dayparts}</small></div>
+            <span class="home-moon">◐</span>
+          </div>
+          <p class="home-prompt">{ui.prompt}</p>
+          <div class="quick-row"><span>● {ui.thought}</span><span>☾ {ui.dream}</span></div>
+          <div class="assistant-card-real">
+            <small>{ui.contactless}</small>
+            <strong>{ui.assistant}</strong>
+            <b>{ui.assistantSub}</b>
+            <span>{ui.assistantMeta}</span>
+            <div class="assistant-card-bottom"><i>● {ui.ready}</i><em>{ui.on}</em></div>
+          </div>
+          <div class="home-mini-grid">
+            <div><strong>{ui.practices}</strong><span>{ui.practiceSub}</span></div>
+            <div><strong>{ui.before}</strong><span>{ui.beforeSub}</span></div>
+          </div>
+          <div class="home-alarm-row"><span>◴</span><div><strong>{ui.alarm}</strong><small>07:30</small></div><b>›</b></div>
+          <div class="home-dream-row"><span class="home-dream-orb">☾</span><div><strong>{ui.dreams}</strong><small>12</small></div><b>›</b></div>
+        </div>
+      )}
+
       {variant === 'night' && (
         <div class="screen-content night-screen">
           <div class="phone-status"><span>03:17</span><span>◔ 82%</span></div>
@@ -30,27 +71,20 @@ const { variant, copy, class: className = '' } = Astro.props;
       )}
 
       {variant === 'morning' && (
-        <div class="screen-content morning-screen">
+        <div class="screen-content morning-screen morning-real">
           <div class="phone-status"><span>08:06</span><span>◔ 76%</span></div>
-          <p class="screen-eyebrow">SOMNORI</p>
-          <h3>{copy.morningTitle}</h3>
-          <p class="screen-muted">{copy.morningSub}</p>
-          <div class="morning-summary">
-            <div><b>2</b><span>dreams</span></div>
-            <div><b>1</b><span>note</span></div>
-            <div><b>03:17</b><span>first entry</span></div>
+          <p class="screen-eyebrow">{ui.morningLabel}</p>
+          <div class="morning-hero-real">
+            <h3>{ui.morningTitle}</h3>
+            <p>{ui.morningSub}</p>
+            <strong>{ui.morningCount}</strong>
+            <span>{ui.recall}</span>
+            <button class="fake-button compact">● {ui.addDream}</button>
           </div>
-          <div class="dream-row">
-            <span class="dream-time">03:17</span>
-            <div><strong>{copy.dreamOne}</strong><small>0:58 · voice</small></div>
-            <span>›</span>
-          </div>
-          <div class="dream-row">
-            <span class="dream-time">05:42</span>
-            <div><strong>{copy.dreamTwo}</strong><small>0:31 · voice</small></div>
-            <span>›</span>
-          </div>
-          <button class="fake-button">{copy.review}</button>
+          <h4 class="morning-section-title">{ui.tonight}</h4>
+          <div class="dream-row"><span class="dream-time">03:17</span><div><strong>{copy.dreamOne}</strong><small>0:58 · voice</small></div><span>›</span></div>
+          <div class="dream-row"><span class="dream-time">05:42</span><div><strong>{copy.dreamTwo}</strong><small>0:31 · voice</small></div><span>›</span></div>
+          <div class="noticed-card"><strong>{ui.noticed}</strong><span>{copy.signOne} · 3×</span></div>
         </div>
       )}
 
@@ -60,14 +94,8 @@ const { variant, copy, class: className = '' } = Astro.props;
           <p class="screen-eyebrow">SOMNORI</p>
           <h3>{copy.signsTitle}</h3>
           <p class="screen-muted">{copy.recurring}</p>
-          <div class="sign-card large-sign">
-            <div class="sign-visual station-lines"></div>
-            <div><strong>{copy.signOne}</strong><small>7× · 5 weeks</small></div>
-          </div>
-          <div class="sign-grid">
-            <div class="sign-card"><span class="sign-icon">⌂</span><strong>{copy.signTwo}</strong><small>5×</small></div>
-            <div class="sign-card"><span class="sign-icon">≈</span><strong>{copy.signThree}</strong><small>4×</small></div>
-          </div>
+          <div class="sign-card large-sign"><div class="sign-visual station-lines"></div><div><strong>{copy.signOne}</strong><small>7× · 5 weeks</small></div></div>
+          <div class="sign-grid"><div class="sign-card"><span class="sign-icon">⌂</span><strong>{copy.signTwo}</strong><small>5×</small></div><div class="sign-card"><span class="sign-icon">≈</span><strong>{copy.signThree}</strong><small>4×</small></div></div>
           <div class="trend-line"><span></span><span></span><span></span><span></span><span></span><span></span></div>
         </div>
       )}
@@ -77,22 +105,10 @@ const { variant, copy, class: className = '' } = Astro.props;
           <div class="phone-status"><span>23:08</span><span>◔ 91%</span></div>
           <p class="screen-eyebrow">SOMNORI</p>
           <h3>{copy.sleepTitle}</h3>
-          <div class="sleep-card featured">
-            <span class="sleep-icon">✦</span>
-            <div><small>Practice</small><strong>{copy.practice}</strong></div>
-            <span>›</span>
-          </div>
-          <div class="sleep-card">
-            <span class="sleep-icon">☾</span>
-            <div><small>Story</small><strong>{copy.story}</strong></div>
-            <span>›</span>
-          </div>
-          <div class="sleep-card">
-            <span class="sleep-icon">♬</span>
-            <div><small>Sound</small><strong>{copy.sound}</strong></div>
-            <span>›</span>
-          </div>
-          <div class="ready-bar"><span class="pulse-dot"></span>{copy.ready}</div>
+          <div class="sleep-card featured"><span class="sleep-icon">✦</span><div><small>{ui.practiceLabel}</small><strong>{ui.intent}</strong></div><span>›</span></div>
+          <div class="sleep-card"><span class="sleep-icon">♬</span><div><small>{ui.soundLabel}</small><strong>{ui.nature}</strong></div><span>›</span></div>
+          <div class="sleep-card"><span class="sleep-icon">◐</span><div><small>{ui.practiceLabel}</small><strong>{ui.autosuggest}</strong></div><span>›</span></div>
+          <div class="ready-bar"><span class="pulse-dot"></span>{ui.nightReady}</div>
         </div>
       )}
     </div>

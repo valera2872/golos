@@ -2,7 +2,7 @@ name: Build Somnori web
 
 on:
   push:
-    branches: [ agent/somnori-web-v1, agent/somnori-web-v2 ]
+    branches: [ agent/somnori-web-v1, agent/somnori-web-v2, agent/somnori-web-v2-1 ]
     paths:
       - 'web/**'
       - '.github/workflows/web-somnori.yml'
@@ -34,7 +34,7 @@ jobs:
         working-directory: web
         run: npm run build
 
-      - name: Validate SEO, hreflang and internal links
+      - name: Validate EN/RU launch, SEO and internal links
         shell: bash
         run: |
           set -euo pipefail
@@ -47,11 +47,12 @@ jobs:
           assert root.exists(), 'dist/ missing'
 
           expected = [
-              '/', '/ru', '/es', '/de', '/fr', '/tr',
+              '/', '/ru',
               '/voice-dream-journal', '/hands-free-dream-journal',
               '/remember-dreams', '/dream-journal', '/privacy', '/terms',
           ]
-          localized = {'/':'en','/ru':'ru','/es':'es','/de':'de','/fr':'fr','/tr':'tr'}
+          localized = {'/':'en','/ru':'ru'}
+          hidden_locales = ['/es','/de','/fr','/tr']
 
           def output_for(path: str):
               clean = path.strip('/')
@@ -73,15 +74,33 @@ jobs:
               if route in localized:
                   lang = localized[route]
                   assert f'<html lang="{lang}"' in html, f'html lang missing for {route}'
-                  for alt in ['en','ru','es','de','fr','tr']:
+                  for alt in ['en','ru']:
                       assert f'hreflang="{alt}"' in html, f'hreflang {alt} missing for {route}'
+                  for hidden in ['es','de','fr','tr']:
+                      assert f'hreflang="{hidden}"' not in html, f'hidden hreflang {hidden} leaked into {route}'
                   assert 'hreflang="x-default"' in html, f'x-default missing for {route}'
+
+          for route in hidden_locales:
+              assert not output_for(route).exists(), f'prepared locale must not be public yet: {route}'
+
+          root_html = output_for('/').read_text(encoding='utf-8')
+          ru_html = output_for('/ru').read_text(encoding='utf-8')
+          for marker in ['English', 'Русский']:
+              assert marker in root_html, f'language switcher missing {marker}'
+          for forbidden in ['Español', 'Deutsch', 'Français', 'Türkçe']:
+              assert forbidden not in root_html, f'prepared language leaked into switcher: {forbidden}'
+          assert 'currently in Russian' in root_html, 'English availability disclosure missing'
+          assert 'проходит тестирование' in ru_html, 'Russian testing disclosure missing'
 
           robots = root / 'robots.txt'
           assert robots.exists(), 'robots.txt missing'
           robots_text = robots.read_text(encoding='utf-8')
           assert 'Sitemap: https://somnori.com/sitemap-index.xml' in robots_text
           assert (root / 'sitemap-index.xml').exists(), 'sitemap-index.xml missing'
+
+          sitemap_text = ''.join(p.read_text(encoding='utf-8') for p in root.glob('sitemap*.xml'))
+          for route in hidden_locales:
+              assert f'https://somnori.com{route}' not in sitemap_text, f'hidden locale leaked into sitemap: {route}'
 
           class Links(HTMLParser):
               def __init__(self):
@@ -107,9 +126,9 @@ jobs:
 
           assert not output_for('/tools/dream-interpreter').exists(), 'dream interpreter placeholder must not be published yet'
 
-          print('Somnori Web v2 validation OK')
+          print('Somnori Web v2.1 validation OK')
           print('Validated pages:', len(expected))
-          print('Localized homepages:', len(localized))
+          print('Public languages: EN, RU')
           PY
 
       - name: Upload static site artifact
