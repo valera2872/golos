@@ -2,7 +2,7 @@ name: Build Somnori web
 
 on:
   push:
-    branches: [ agent/somnori-web-v1 ]
+    branches: [ agent/somnori-web-v1, agent/somnori-web-v2 ]
     paths:
       - 'web/**'
       - '.github/workflows/web-somnori.yml'
@@ -34,7 +34,7 @@ jobs:
         working-directory: web
         run: npm run build
 
-      - name: Validate SEO output and internal links
+      - name: Validate SEO, hreflang and internal links
         shell: bash
         run: |
           set -euo pipefail
@@ -47,14 +47,11 @@ jobs:
           assert root.exists(), 'dist/ missing'
 
           expected = [
-              '/',
-              '/voice-dream-journal',
-              '/hands-free-dream-journal',
-              '/remember-dreams',
-              '/dream-journal',
-              '/privacy',
-              '/terms',
+              '/', '/ru', '/es', '/de', '/fr', '/tr',
+              '/voice-dream-journal', '/hands-free-dream-journal',
+              '/remember-dreams', '/dream-journal', '/privacy', '/terms',
           ]
+          localized = {'/':'en','/ru':'ru','/es':'es','/de':'de','/fr':'fr','/tr':'tr'}
 
           def output_for(path: str):
               clean = path.strip('/')
@@ -73,6 +70,12 @@ jobs:
               canonical = 'https://somnori.com/' if route == '/' else f'https://somnori.com{route}'
               assert f'rel="canonical" href="{canonical}"' in html or f'href="{canonical}" rel="canonical"' in html, f'canonical missing for {route}'
               assert '<h1' in html.lower(), f'H1 missing for {route}'
+              if route in localized:
+                  lang = localized[route]
+                  assert f'<html lang="{lang}"' in html, f'html lang missing for {route}'
+                  for alt in ['en','ru','es','de','fr','tr']:
+                      assert f'hreflang="{alt}"' in html, f'hreflang {alt} missing for {route}'
+                  assert 'hreflang="x-default"' in html, f'x-default missing for {route}'
 
           robots = root / 'robots.txt'
           assert robots.exists(), 'robots.txt missing'
@@ -99,15 +102,14 @@ jobs:
                   if not path or not path.startswith('/'): continue
                   if path.startswith('/_astro/'): continue
                   target=output_for(path)
-                  if not target.exists():
-                      broken.append((str(html_file.relative_to(root)), href))
+                  if not target.exists(): broken.append((str(html_file.relative_to(root)), href))
           assert not broken, 'broken internal links: ' + repr(broken[:20])
 
-          # Guard against accidentally publishing future tool placeholders.
           assert not output_for('/tools/dream-interpreter').exists(), 'dream interpreter placeholder must not be published yet'
 
-          print('Somnori web validation OK')
-          print('Launch pages:', len(expected))
+          print('Somnori Web v2 validation OK')
+          print('Validated pages:', len(expected))
+          print('Localized homepages:', len(localized))
           PY
 
       - name: Upload static site artifact
