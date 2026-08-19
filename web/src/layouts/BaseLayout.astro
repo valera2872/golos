@@ -2,8 +2,10 @@
 import '../styles/global.css';
 import '../styles/v2.css';
 import '../styles/v21.css';
+import '../styles/v22.css';
 import { copy, homePath, localeMeta, type Locale } from '../i18n/site';
-import { publicLocales } from '../i18n/public';
+import { publicLocales, isPublicLocale } from '../i18n/public';
+import { homeV22 } from '../i18n/home-v22';
 
 interface Alternate { lang: string; href: string }
 
@@ -34,7 +36,8 @@ const normalizeUrl = (href: string) => {
 };
 const canonicalUrl = normalizeUrl(canonical);
 const ogType = type === 'article' ? 'article' : 'website';
-const t = copy[locale];
+const legacy = copy[locale];
+const publicCopy = isPublicLocale(locale) ? homeV22[locale] : null;
 const base = homePath(locale);
 const anchor = (id: string) => `${base}#${id}`;
 
@@ -80,18 +83,29 @@ const softwareSchema = type === 'software' ? {
     {softwareSchema && <script type="application/ld+json" set:html={JSON.stringify(softwareSchema)} />}
   </head>
   <body>
-    <a class="skip-link" href="#content">{t.skip}</a>
+    <a class="skip-link" href="#content">{legacy.skip}</a>
     <header class="site-header">
       <div class="nav-shell">
         <a class="brand" href={base} aria-label="Somnori home"><span class="brand-mark">◐</span>Somnori</a>
         <nav class="main-nav" aria-label="Main navigation">
-          <a href={anchor('product')}>{t.nav.product}</a>
-          <a href={anchor('how-it-works')}>{t.nav.how}</a>
-          <a href={anchor('morning')}>{t.nav.morning}</a>
-          <a href={anchor('learn')}>{t.nav.learn}</a>
+          {publicCopy ? (
+            <>
+              <a href={anchor('product')}>{publicCopy.nav.product}</a>
+              <a href={anchor('capture')}>{publicCopy.nav.capture}</a>
+              <a href={anchor('routine')}>{publicCopy.nav.routine}</a>
+              <a href={anchor('dreams')}>{publicCopy.nav.dreams}</a>
+            </>
+          ) : (
+            <>
+              <a href={anchor('product')}>{legacy.nav.product}</a>
+              <a href={anchor('how-it-works')}>{legacy.nav.how}</a>
+              <a href={anchor('morning')}>{legacy.nav.morning}</a>
+              <a href={anchor('learn')}>{legacy.nav.learn}</a>
+            </>
+          )}
         </nav>
         <details class="language-switcher">
-          <summary aria-label={t.nav.language}><span class="globe">◎</span>{localeMeta[locale].native}<span class="chevron">⌄</span></summary>
+          <summary aria-label={publicCopy?.nav.language ?? legacy.nav.language}><span class="globe">◎</span>{localeMeta[locale].native}<span class="chevron">⌄</span></summary>
           <div class="language-menu">
             {publicLocales.map((lang) => (
               <a class={lang === locale ? 'active' : ''} href={localeMeta[lang].path} lang={lang} hreflang={lang}>
@@ -100,7 +114,7 @@ const softwareSchema = type === 'software' ? {
             ))}
           </div>
         </details>
-        <a class="nav-cta" href={anchor('app')}>{t.nav.app}</a>
+        <a class="nav-cta" href={anchor('app')}>{publicCopy?.nav.app ?? legacy.nav.app}</a>
       </div>
     </header>
     <main id="content">
@@ -108,49 +122,86 @@ const softwareSchema = type === 'software' ? {
     </main>
     <footer class="site-footer">
       <div class="shell">
-        <div class="footer-grid footer-grid-v2">
-          <div>
-            <div class="brand"><span class="brand-mark">◐</span>Somnori</div>
-            <p class="footer-copy">{t.footer.tagline}</p>
-          </div>
-          <div>
-            <div class="footer-title">{t.footer.product}</div>
-            <div class="footer-links">
-              <a href={anchor('how-it-works')}>{t.nav.how}</a>
-              <a href={anchor('morning')}>{t.nav.morning}</a>
-              <a href={anchor('learn')}>{t.nav.learn}</a>
+        {publicCopy ? (
+          <>
+            <div class="footer-grid footer-grid-v2">
+              <div>
+                <div class="brand"><span class="brand-mark">◐</span>Somnori</div>
+                <p class="footer-copy">{publicCopy.footer.tagline}</p>
+              </div>
+              <div>
+                <div class="footer-title">{publicCopy.footer.product}</div>
+                <div class="footer-links">
+                  <a href={anchor('capture')}>{publicCopy.nav.capture}</a>
+                  <a href={anchor('routine')}>{publicCopy.nav.routine}</a>
+                  <a href={anchor('dreams')}>{publicCopy.nav.dreams}</a>
+                </div>
+              </div>
+              <div>
+                <div class="footer-title">{publicCopy.footer.explore}</div>
+                <div class="footer-links">
+                  {locale === 'en' ? (
+                    <>
+                      <a href="/voice-dream-journal">Voice Dream Journal</a>
+                      <a href="/hands-free-dream-journal">Hands-Free Dream Capture</a>
+                      <a href="/remember-dreams">How to Remember Dreams</a>
+                    </>
+                  ) : (
+                    <>
+                      <a href={anchor('night-utilities')}>{publicCopy.nav.capture}</a>
+                      <a href={anchor('capabilities')}>Somnori</a>
+                      <a href={anchor('privacy')}>{publicCopy.footer.privacy}</a>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div>
+                <div class="footer-title">{publicCopy.footer.legal}</div>
+                <div class="footer-links">
+                  <a href="/privacy">{publicCopy.footer.privacy}</a>
+                  <a href="/terms">{publicCopy.footer.terms}</a>
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div class="footer-title">{t.footer.learn}</div>
-            <div class="footer-links">
-              {locale === 'en' ? (
-                <>
+            <div class="footer-bottom">
+              <span>© {new Date().getFullYear()} Somnori</span>
+              <span>{publicCopy.footer.global}</span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div class="footer-grid footer-grid-v2">
+              <div>
+                <div class="brand"><span class="brand-mark">◐</span>Somnori</div>
+                <p class="footer-copy">{legacy.footer.tagline}</p>
+              </div>
+              <div>
+                <div class="footer-title">{legacy.footer.product}</div>
+                <div class="footer-links">
+                  <a href={anchor('how-it-works')}>{legacy.nav.how}</a>
+                  <a href={anchor('morning')}>{legacy.nav.morning}</a>
+                  <a href={anchor('learn')}>{legacy.nav.learn}</a>
+                </div>
+              </div>
+              <div>
+                <div class="footer-title">{legacy.footer.learn}</div>
+                <div class="footer-links">
                   <a href="/remember-dreams">How to Remember Dreams</a>
                   <a href="/voice-dream-journal">Voice Dream Journal</a>
                   <a href="/hands-free-dream-journal">Hands-Free Capture</a>
-                </>
-              ) : (
-                <>
-                  <a href={anchor('product')}>{t.nav.product}</a>
-                  <a href={anchor('learn')}>{t.signs.eyebrow}</a>
-                  <a href={anchor('privacy')}>{t.privacy.eyebrow}</a>
-                </>
-              )}
+                </div>
+              </div>
+              <div>
+                <div class="footer-title">{legacy.footer.legal}</div>
+                <div class="footer-links">
+                  <a href="/privacy">{legacy.footer.privacy}</a>
+                  <a href="/terms">{legacy.footer.terms}</a>
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div class="footer-title">{t.footer.legal}</div>
-            <div class="footer-links">
-              <a href="/privacy">{t.footer.privacy}</a>
-              <a href="/terms">{t.footer.terms}</a>
-            </div>
-          </div>
-        </div>
-        <div class="footer-bottom">
-          <span>© {new Date().getFullYear()} Somnori</span>
-          <span>{t.footer.global}</span>
-        </div>
+            <div class="footer-bottom"><span>© {new Date().getFullYear()} Somnori</span><span>{legacy.footer.global}</span></div>
+          </>
+        )}
       </div>
     </footer>
   </body>

@@ -1,0 +1,26 @@
+---
+interface Props {
+  label: string;
+  caption: string;
+  variant?: 'home' | 'capture' | 'routine' | 'dreams';
+  class?: string;
+}
+const { label, caption, variant = 'home', class: className = '' } = Astro.props;
+---
+<div class={`product-placeholder ${className}`} data-screenshot-slot={variant} aria-label={caption}>
+  <div class="placeholder-phone">
+    <div class="placeholder-speaker"></div>
+    <div class={`placeholder-screen placeholder-${variant}`}>
+      <div class="placeholder-orb"></div>
+      <div class="placeholder-ui">
+        <span class="placeholder-kicker">SOMNORI</span>
+        <strong>{label}</strong>
+        <div class="placeholder-line long"></div>
+        <div class="placeholder-line medium"></div>
+        <div class="placeholder-card"></div>
+        <div class="placeholder-row"><i></i><i></i><i></i></div>
+      </div>
+      <div class="placeholder-badge">{caption}</div>
+    </div>
+  </div>
+</div>
