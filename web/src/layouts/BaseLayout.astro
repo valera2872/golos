@@ -1,0 +1,116 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  canonical?: string;
+  type?: 'website' | 'article' | 'software';
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description,
+  canonical = Astro.url.pathname,
+  type = 'website',
+  noindex = false,
+} = Astro.props;
+
+const site = 'https://somnori.com';
+const canonicalUrl = new URL(canonical, site).toString();
+const ogType = type === 'article' ? 'article' : 'website';
+
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Somnori',
+  url: site,
+};
+
+const softwareSchema = type === 'software' ? {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Somnori',
+  applicationCategory: 'LifestyleApplication',
+  operatingSystem: 'Android',
+  url: canonicalUrl,
+  description,
+} : null;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#070816" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    {noindex && <meta name="robots" content="noindex,follow" />}
+    <meta property="og:type" content={ogType} />
+    <meta property="og:site_name" content="Somnori" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta name="twitter:card" content="summary" />
+    <script type="application/ld+json" set:html={JSON.stringify(organizationSchema)} />
+    {softwareSchema && <script type="application/ld+json" set:html={JSON.stringify(softwareSchema)} />}
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <div class="nav-shell">
+        <a class="brand" href="/" aria-label="Somnori home"><span class="brand-mark">◐</span>Somnori</a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <a href="/voice-dream-journal">Voice journal</a>
+          <a href="/hands-free-dream-journal">Hands-free</a>
+          <a href="/remember-dreams">Remember dreams</a>
+          <a href="/dream-journal">Dream journal</a>
+          <a class="nav-cta" href="/#early-access">Android app</a>
+        </nav>
+      </div>
+    </header>
+    <main id="content">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="shell">
+        <div class="footer-grid">
+          <div>
+            <div class="brand"><span class="brand-mark">◐</span>Somnori</div>
+            <p class="footer-copy">A nighttime dream journal for capturing what you remember before it disappears.</p>
+          </div>
+          <div>
+            <div class="footer-title">Product</div>
+            <div class="footer-links">
+              <a href="/voice-dream-journal">Voice Dream Journal</a>
+              <a href="/hands-free-dream-journal">Hands-Free Capture</a>
+              <a href="/dream-journal">Dream Journal</a>
+            </div>
+          </div>
+          <div>
+            <div class="footer-title">Learn</div>
+            <div class="footer-links">
+              <a href="/remember-dreams">How to Remember Dreams</a>
+              <a href="/#night-to-morning">Night to Morning</a>
+              <a href="/#privacy">Privacy principles</a>
+            </div>
+          </div>
+          <div>
+            <div class="footer-title">Somnori</div>
+            <div class="footer-links">
+              <a href="/#early-access">Android release</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </div>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© {new Date().getFullYear()} Somnori</span>
+          <span>English site · Russian version planned after the English launch is validated.</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
