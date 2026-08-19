@@ -25,8 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
         working-directory: web
@@ -44,7 +42,6 @@ jobs:
           from html.parser import HTMLParser
           from pathlib import Path
           from urllib.parse import urlparse
-          import re
 
           root = Path('web/dist')
           assert root.exists(), 'dist/ missing'
