@@ -1,0 +1,90 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SeoProductBridge from '../components/SeoProductBridge.astro';
+
+const title = 'Night Thought Recorder for Ideas Before Sleep | Somnori';
+const description = 'Capture thoughts, ideas and midnight insights by voice without turning the moment into a full phone session. Somnori keeps night entries together for the morning.';
+---
+<BaseLayout title={title} description={description} canonical="/night-thought-recorder" type="software">
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Night Thought Recorder</div>
+      <p class="eyebrow">Night thoughts & ideas</p>
+      <h1>Record the Idea Without Waking Yourself Up</h1>
+      <p class="lead">A useful thought can arrive while you are falling asleep, at 2AM, or in the few seconds after waking. Somnori is built to save that thought by voice and let you deal with it when morning comes.</p>
+      <div class="actions">
+        <a class="button primary" href="#how-it-works">See the night flow</a>
+        <a class="button secondary" href="/#system">See the full Somnori system</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight" id="how-it-works">
+    <div class="article-shell wide">
+      <div class="flow">
+        <div class="flow-step"><div class="flow-number">1</div><h3>A thought appears</h3><p class="muted">An idea, phrase, task or solution is suddenly clear.</p></div>
+        <div class="flow-step"><div class="flow-number">2</div><h3>Call Somnori</h3><p class="muted">Use the night assistant instead of opening a notes app.</p></div>
+        <div class="flow-step"><div class="flow-number">3</div><h3>Say the thought</h3><p class="muted">Capture the rough version. It does not need to be polished.</p></div>
+        <div class="flow-step"><div class="flow-number">4</div><h3>Leave it for morning</h3><p class="muted">Go back to sleep instead of turning the idea into a 20-minute phone session.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <SeoProductBridge
+    eyebrow="Capture layer"
+    title="Thoughts, ideas and dreams use the same low-friction night capture."
+    text="Somnori does not force every nighttime voice entry to become a dream. The same hands-free capture layer can preserve an idea, a reminder, a sentence or a dream fragment, then keep it inside the context of that night."
+    focus="Night thought capture"
+    variant="capture"
+  />
+
+  <article class="article-shell prose section-tight">
+    <h2>Why nighttime ideas are a different capture problem</h2>
+    <p>During the day, opening a notes app is usually harmless. At night, the interaction itself can be the problem. Unlocking the phone, seeing notifications, choosing a folder and editing text can pull you out of the half-asleep state you were trying to preserve.</p>
+    <p>Somnori treats the night as its own context. The goal is simple: <strong>save enough of the idea to trust that it will still be there in the morning</strong>.</p>
+
+    <h2>What counts as a night thought?</h2>
+    <p>Anything you do not want to keep holding in working memory:</p>
+    <ul>
+      <li>a product or website idea;</li>
+      <li>a phrase for an article, story or presentation;</li>
+      <li>a solution to something you were thinking about earlier;</li>
+      <li>a reminder for tomorrow;</li>
+      <li>a personal reflection;</li>
+      <li>a dream fragment that you are not yet sure is worth journaling as a dream.</li>
+    </ul>
+
+    <h2>Night thought recorder vs. a normal voice memo</h2>
+    <table class="compare-table">
+      <thead><tr><th>Need</th><th>Voice memo</th><th>Somnori direction</th></tr></thead>
+      <tbody>
+        <tr><td>Record speech</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Start in a night-specific mode</td><td>Usually manual</td><td>Night Assistant is built for this context</td></tr>
+        <tr><td>Keep thoughts and dreams in one night</td><td>Manual organization</td><td>Night entries stay together</td></tr>
+        <tr><td>Ask the time or set an alarm without switching apps</td><td>No</td><td>Part of the same night assistant</td></tr>
+        <tr><td>Return to the night in the morning</td><td>Open the recording list</td><td>Morning is part of the product flow</td></tr>
+      </tbody>
+    </table>
+
+    <h2>The point is not transcription perfection</h2>
+    <p>A midnight idea may be incomplete. That is fine. The important thing is preserving the original meaning before you start editing it. Somnori keeps the voice entry so the morning version of you can decide what the idea was actually worth.</p>
+
+    <h2>One capture layer, several reasons to use it</h2>
+    <p>Some people will install Somnori for dreams. Others may barely use the dream journal and care much more about ideas, reminders and thoughts that arrive around sleep. Both behaviors belong to the same design problem: <strong>you want to save something without turning on the rest of your phone experience</strong>.</p>
+
+    <h2>What Somnori is not trying to replace</h2>
+    <p>It is not a full daytime productivity system, project manager or knowledge base. Once you are awake, specialist tools may be better places to develop the idea. Somnori's job is the fragile handoff from night to morning.</p>
+
+    <h2>Related Somnori layers</h2>
+    <p>If the reason you touch the phone at night is to check the time or change an alarm, see <a href="/voice-alarm-at-night">voice alarm and time at night</a>. If the challenge starts before you fall asleep, see the <a href="/bedtime-routine-app">bedtime routine</a> layer.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">The night rule</p>
+      <h2>Capture enough. Do the thinking in daylight.</h2>
+      <p class="lead">Somnori is built to reduce the number of reasons you need to fully engage with your phone after you have gone to bed.</p>
+      <div class="actions"><a class="button primary" href="/#capture">See capture in Somnori</a></div>
+    </div>
+  </section>
+</BaseLayout>
