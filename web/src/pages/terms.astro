@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Terms | Somnori';
+const description = 'Terms for using the Somnori pre-release informational website.';
+---
+<BaseLayout title={title} description={description} canonical="/terms" type="article">
+  <section class="article-hero">
+    <div class="article-shell">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Terms</div>
+      <p class="eyebrow">Terms</p>
+      <h1>Website Terms</h1>
+      <p class="lead">These terms apply to the current pre-release Somnori informational website.</p>
+    </div>
+  </section>
+  <article class="article-shell prose section-tight">
+    <h2>Pre-release information</h2>
+    <p>Somnori is under active development. Product descriptions on this site distinguish current capabilities from planned directions, but details may still change before public distribution.</p>
+
+    <h2>No medical advice</h2>
+    <p>Content about dreams, sleep, autosuggestion or lucid dreaming is provided for general educational and product-information purposes. It is not a substitute for medical, psychiatric or psychological diagnosis or treatment.</p>
+
+    <h2>Third-party references</h2>
+    <p>The site may link to research, app stores, competitors or other third-party resources for context. Those services are governed by their own terms and policies.</p>
+
+    <h2>Future app terms</h2>
+    <p>The public Android application will have product-specific terms before distribution, including any subscription, account, cloud-processing or paid-feature conditions that actually apply at launch.</p>
+  </article>
+</BaseLayout>

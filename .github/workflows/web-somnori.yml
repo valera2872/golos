@@ -1,0 +1,118 @@
+name: Build Somnori web
+
+on:
+  push:
+    branches: [ agent/somnori-web-v1 ]
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-somnori.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-somnori.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund
+
+      - name: Build static site
+        working-directory: web
+        run: npm run build
+
+      - name: Validate SEO output and internal links
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          root = Path('web/dist')
+          assert root.exists(), 'dist/ missing'
+
+          expected = [
+              '/',
+              '/voice-dream-journal',
+              '/hands-free-dream-journal',
+              '/remember-dreams',
+              '/dream-journal',
+              '/privacy',
+              '/terms',
+          ]
+
+          def output_for(path: str):
+              clean = path.strip('/')
+              if not clean:
+                  return root / 'index.html'
+              candidates = [root / clean / 'index.html', root / f'{clean}.html']
+              for candidate in candidates:
+                  if candidate.exists():
+                      return candidate
+              return candidates[0]
+
+          for route in expected:
+              page = output_for(route)
+              assert page.exists(), f'missing built page for {route}: {page}'
+              html = page.read_text(encoding='utf-8')
+              canonical = 'https://somnori.com/' if route == '/' else f'https://somnori.com{route}'
+              assert f'rel="canonical" href="{canonical}"' in html or f'href="{canonical}" rel="canonical"' in html, f'canonical missing for {route}'
+              assert '<h1' in html.lower(), f'H1 missing for {route}'
+
+          robots = root / 'robots.txt'
+          assert robots.exists(), 'robots.txt missing'
+          robots_text = robots.read_text(encoding='utf-8')
+          assert 'Sitemap: https://somnori.com/sitemap-index.xml' in robots_text
+          assert (root / 'sitemap-index.xml').exists(), 'sitemap-index.xml missing'
+
+          class Links(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.hrefs=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag != 'a': return
+                  for key, value in attrs:
+                      if key == 'href' and value: self.hrefs.append(value)
+
+          broken=[]
+          for html_file in root.rglob('*.html'):
+              parser=Links(); parser.feed(html_file.read_text(encoding='utf-8'))
+              for href in parser.hrefs:
+                  if href.startswith(('#','mailto:','tel:')): continue
+                  parsed=urlparse(href)
+                  if parsed.scheme or parsed.netloc: continue
+                  path=parsed.path
+                  if not path or not path.startswith('/'): continue
+                  if path.startswith('/_astro/'): continue
+                  target=output_for(path)
+                  if not target.exists():
+                      broken.append((str(html_file.relative_to(root)), href))
+          assert not broken, 'broken internal links: ' + repr(broken[:20])
+
+          # Guard against accidentally publishing future tool placeholders.
+          assert not output_for('/tools/dream-interpreter').exists(), 'dream interpreter placeholder must not be published yet'
+
+          print('Somnori web validation OK')
+          print('Launch pages:', len(expected))
+          PY
+
+      - name: Upload static site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: somnori-web-dist
+          path: web/dist
+          retention-days: 14

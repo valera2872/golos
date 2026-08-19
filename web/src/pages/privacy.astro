@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Privacy | Somnori';
+const description = 'Privacy information for the Somnori pre-release website.';
+---
+<BaseLayout title={title} description={description} canonical="/privacy" type="article">
+  <section class="article-hero">
+    <div class="article-shell">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Privacy</div>
+      <p class="eyebrow">Privacy</p>
+      <h1>Privacy at Somnori</h1>
+      <p class="lead">Dream data is unusually personal. This page describes the current pre-release website; the Android app will receive a separate, implementation-specific privacy policy before public distribution.</p>
+    </div>
+  </section>
+  <article class="article-shell prose section-tight">
+    <h2>This website today</h2>
+    <p>The initial Somnori website is a static informational site. It does not currently provide user accounts, accept dream recordings, or offer a web dream-interpreter form.</p>
+    <p>Like most websites, the hosting infrastructure may process ordinary technical request data such as IP address, browser information, requested URL and timestamps for security and server operation.</p>
+
+    <h2>Analytics and cookies</h2>
+    <p>No analytics or advertising integration is included in the initial source build. If analytics, consent tools or other tracking technologies are added later, this page will be updated to describe them before they are relied on in production.</p>
+
+    <h2>The Android app</h2>
+    <p>The app can contain voice recordings and dream-journal information. Before the public Android release, Somnori will publish a separate policy that states exactly what is stored on-device, what—if anything—is transmitted to external services, how transcription works, and how users can export or delete their data.</p>
+    <p>We will not use future product intentions as present-tense privacy promises.</p>
+
+    <h2>Changes</h2>
+    <p>This page will change as the public product and website capabilities change. Material changes should be reflected here alongside the relevant product release.</p>
+  </article>
+</BaseLayout>
