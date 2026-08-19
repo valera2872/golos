@@ -26,7 +26,11 @@ const {
 } = Astro.props;
 
 const site = 'https://somnori.com';
-const canonicalUrl = new URL(canonical, site).toString();
+const normalizeUrl = (href: string) => {
+  const value = new URL(href, site).toString();
+  return value !== `${site}/` && value.endsWith('/') ? value.slice(0, -1) : value;
+};
+const canonicalUrl = normalizeUrl(canonical);
 const ogType = type === 'article' ? 'article' : 'website';
 const t = copy[locale];
 const base = homePath(locale);
@@ -59,7 +63,7 @@ const softwareSchema = type === 'software' ? {
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
     {alternates.map((alternate) => (
-      <link rel="alternate" hreflang={alternate.lang} href={new URL(alternate.href, site).toString()} />
+      <link rel="alternate" hreflang={alternate.lang} href={normalizeUrl(alternate.href)} />
     ))}
     {alternates.length > 0 && <link rel="alternate" hreflang="x-default" href={`${site}/`} />}
     {noindex && <meta name="robots" content="noindex,follow" />}
