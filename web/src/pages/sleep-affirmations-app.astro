@@ -1,0 +1,94 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SeoProductBridge from '../components/SeoProductBridge.astro';
+
+const title = 'Sleep Affirmations App & Bedtime Autosuggestion | Somnori';
+const description = 'Use personal affirmations or autosuggestion as part of a prepared bedtime routine, combined with sound, practices and the broader Somnori night system.';
+---
+<BaseLayout title={title} description={description} canonical="/sleep-affirmations-app" type="software">
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Sleep Affirmations</div>
+      <p class="eyebrow">Autosuggestion before sleep</p>
+      <h1>Make Autosuggestion Part of the Night You Planned</h1>
+      <p class="lead">Somnori treats affirmations and autosuggestion as one optional part of a personal bedtime routine — alongside sound, practices and the night functions that remain useful after you fall asleep.</p>
+      <div class="actions">
+        <a class="button primary" href="#approach">How Somnori approaches it</a>
+        <a class="button secondary" href="/bedtime-routine-app">Bedtime routine</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight" id="approach">
+    <div class="article-shell wide proof-strip">
+      <div class="proof-item"><b>Personal</b><span>Use a phrase or intention that actually matters to you.</span></div>
+      <div class="proof-item"><b>Combined</b><span>Place it beside sound or another before-sleep practice.</span></div>
+      <div class="proof-item"><b>Calm</b><span>The goal is a low-friction bedtime ritual, not another content feed.</span></div>
+      <div class="proof-item"><b>Grounded</b><span>No promise of guaranteed subconscious “reprogramming” or medical results.</span></div>
+    </div>
+  </section>
+
+  <SeoProductBridge
+    eyebrow="Routine layer"
+    title="Autosuggestion is more useful when it belongs to a repeatable night context."
+    text="Somnori places personal suggestion beside the rest of your before-sleep setup, while the same app can later answer the time, manage an alarm, capture a thought or preserve a dream."
+    focus="Autosuggestion"
+    variant="routine"
+  />
+
+  <article class="article-shell prose section-tight">
+    <h2>Affirmations, autosuggestion and intention are not exactly the same thing</h2>
+    <p>People use these words differently. An affirmation is usually a short statement repeated intentionally. Autosuggestion is a broader self-directed practice in which a person uses words, imagery or repeated cues to influence attention, expectation or behavior. A bedtime intention can be even simpler: a sentence that reminds you what you want to notice or do.</p>
+    <p>Somnori does not need to force one philosophy. The product value is giving you a calm place to use the wording you choose.</p>
+
+    <h2>Why pair it with a bedtime routine?</h2>
+    <p>A suggestion used randomly is easy to forget. A suggestion attached to a stable sequence is easier to repeat: sound, short practice, chosen phrase, then sleep. Somnori's before-sleep layer is designed around that continuity.</p>
+
+    <h2>A simple example</h2>
+    <ol>
+      <li>start a quiet nature track;</li>
+      <li>use a short breathing or attention practice;</li>
+      <li>play or repeat one personal suggestion;</li>
+      <li>leave Night Assistant ready;</li>
+      <li>go to sleep.</li>
+    </ol>
+    <p>The exact content can be about dream recall, tomorrow's focus, confidence, a personal goal or simply the tone you want to carry into the night.</p>
+
+    <h2>Somnori should not sell magical claims</h2>
+    <p>Sleep-affirmation products often use strong language about subconscious transformation. Somnori should be more careful. A personal suggestion can be part of a reflective, motivational or relaxation practice, but the app should not promise guaranteed personality change, treatment of anxiety, or other medical outcomes.</p>
+
+    <h2>Own voice or guided voice?</h2>
+    <p>Both can be useful product options. A guided recording is convenient; a self-recorded phrase can feel more personal. Somnori's current direction is to support practical, customizable audio rather than build an enormous generic affirmation library.</p>
+
+    <h2>Where Somnori differs from a dedicated affirmation app</h2>
+    <table class="compare-table">
+      <thead><tr><th>Need</th><th>Dedicated affirmation app</th><th>Somnori direction</th></tr></thead>
+      <tbody>
+        <tr><td>Large affirmation library</td><td>Often the main product</td><td>Not the goal</td></tr>
+        <tr><td>Personal suggestion</td><td>Often supported</td><td>Part of the bedtime layer</td></tr>
+        <tr><td>Mix with calm sound</td><td>Common in the category</td><td>Part of the same routine</td></tr>
+        <tr><td>Ask time / manage alarm later</td><td>Usually outside the app</td><td>Same night system</td></tr>
+        <tr><td>Capture thoughts or dreams at night</td><td>Usually outside the app</td><td>Same Night Assistant</td></tr>
+        <tr><td>Wake protocol</td><td>Varies</td><td>Planned next product layer</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Autosuggestion can also support the dream layer</h2>
+    <p>One use case is a simple dream-recall intention before sleep. Another is lucid-dream practice. That does not make every autosuggestion a dream feature; it shows why the routine and dream layers can share the same night system.</p>
+
+    <h2>What comes next</h2>
+    <p>The stronger long-term model is a protocol rather than a playlist: a chosen sequence before sleep, Night Assistant during the night, and eventually a wake sequence after the alarm. The wake-protocol part remains a roadmap item until it is implemented and verified.</p>
+
+    <h2>Related Somnori layers</h2>
+    <p>See the broader <a href="/bedtime-routine-app">bedtime routine app</a> concept, or move to the night itself with <a href="/voice-alarm-at-night">voice alarm and time</a> and <a href="/night-thought-recorder">night thought capture</a>.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">Personal protocol</p>
+      <h2>Use the words you chose — inside the night you designed.</h2>
+      <p class="lead">Somnori's role is to connect autosuggestion with the rest of your evening and night rather than promise a magical result from a single track.</p>
+      <div class="actions"><a class="button primary" href="/#routine">See the routine layer</a></div>
+    </div>
+  </section>
+</BaseLayout>

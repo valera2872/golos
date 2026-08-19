@@ -1,0 +1,86 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SeoProductBridge from '../components/SeoProductBridge.astro';
+
+const title = 'Voice Alarm & Time at Night Without Unlocking | Somnori';
+const description = 'Ask the time and manage an alarm by voice at night without turning the interaction into a full phone session. Somnori keeps these utilities inside the Night Assistant.';
+---
+<BaseLayout title={title} description={description} canonical="/voice-alarm-at-night" type="software">
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Voice Alarm at Night</div>
+      <p class="eyebrow">Hands-free night utilities</p>
+      <h1>Ask the Time. Set an Alarm. Keep Your Eyes Closed.</h1>
+      <p class="lead">Sometimes the most useful night assistant is not an AI conversation. It is a reliable answer to “what time is it?” or a quick alarm change without reaching for the screen.</p>
+      <div class="actions">
+        <a class="button primary" href="#night-utilities">See the night use case</a>
+        <a class="button secondary" href="/night-thought-recorder">Night thought capture</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight" id="night-utilities">
+    <div class="article-shell wide proof-strip">
+      <div class="proof-item"><b>Ask the time</b><span>Hear the answer instead of looking at the display.</span></div>
+      <div class="proof-item"><b>Set an alarm</b><span>Use a voice command in the same night context.</span></div>
+      <div class="proof-item"><b>Stay in night mode</b><span>No need to switch to a clock or assistant app.</span></div>
+      <div class="proof-item"><b>Continue the night</b><span>Return to sleep, capture a thought, or use your bedtime layer.</span></div>
+    </div>
+  </section>
+
+  <SeoProductBridge
+    eyebrow="Night layer"
+    title="Time and alarm belong inside the same hands-free night context."
+    text="Somnori is not trying to become a general-purpose assistant. The point is narrower: once the night mode is ready, common nighttime actions should not force you back into normal phone navigation."
+    focus="Time & voice alarm"
+    variant="home"
+  />
+
+  <article class="article-shell prose section-tight">
+    <h2>Why checking the time can wake you more than the answer itself</h2>
+    <p>The information is simple. The interaction is not. Reaching for the phone can expose you to a bright display, notifications and the temptation to keep looking. A spoken time answer removes most of that interaction.</p>
+    <p>The same logic applies to alarms: if you suddenly decide you need to wake at a different time, the useful workflow is to say it and go back to sleep.</p>
+
+    <h2>This is not the same as “an alarm that talks”</h2>
+    <p>There are dedicated alarm apps that announce the time or let you create alarms by voice. Somnori's distinction is the surrounding night context. Time and alarm are available alongside thought capture, dream capture and the before-sleep layer instead of living as isolated utilities.</p>
+
+    <h2>What the current Somnori direction includes</h2>
+    <ul>
+      <li>voice-first Night Assistant;</li>
+      <li>spoken time queries;</li>
+      <li>voice alarm commands;</li>
+      <li>night thought and dream capture in the same mode;</li>
+      <li>a separate morning layer after the night is over.</li>
+    </ul>
+
+    <h2>What it does not mean</h2>
+    <p>“Voice alarm” here does not mean Somnori currently detects your sleep stage and chooses the biologically perfect wake-up moment. That kind of smart wake feature would require reliable sleep or wearable data and is a separate product layer.</p>
+    <p>It also does not mean Somnori needs to beat Google or another system assistant at every general command. The product advantage is the <strong>continuous night workflow</strong>.</p>
+
+    <h2>A useful night assistant should reduce reasons to touch the phone</h2>
+    <table class="compare-table">
+      <thead><tr><th>Night need</th><th>Typical phone flow</th><th>Somnori goal</th></tr></thead>
+      <tbody>
+        <tr><td>What time is it?</td><td>Wake screen and look</td><td>Ask and hear the answer</td></tr>
+        <tr><td>Change wake time</td><td>Open Clock, edit alarm</td><td>Say the alarm command</td></tr>
+        <tr><td>Save an idea</td><td>Open Notes or Recorder</td><td>Use the same Night Assistant</td></tr>
+        <tr><td>Save a dream</td><td>Open a dream journal</td><td>Use the same Night Assistant</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Where this becomes more interesting</h2>
+    <p>The longer-term direction is not merely a better alarm screen. It is a wake protocol: alarm, chosen audio, a morning cue or autosuggestion, and a controlled transition into the day. That sequence is a roadmap layer and should not be confused with the alarm functions already available now.</p>
+
+    <h2>Related Somnori layers</h2>
+    <p>For ideas and reminders, see the <a href="/night-thought-recorder">night thought recorder</a>. For the part of the night before you fall asleep, see the <a href="/bedtime-routine-app">bedtime routine app</a>.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">Night Assistant</p>
+      <h2>Simple commands matter when the alternative is waking yourself up.</h2>
+      <p class="lead">Somnori keeps time, alarm and capture in one nighttime context rather than turning each need into a separate app session.</p>
+      <div class="actions"><a class="button primary" href="/#night-utilities">See Night Assistant features</a></div>
+    </div>
+  </section>
+</BaseLayout>

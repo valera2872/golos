@@ -1,0 +1,97 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SeoProductBridge from '../components/SeoProductBridge.astro';
+
+const title = 'Bedtime Routine App for Sound, Practices & Autosuggestion | Somnori';
+const description = 'Somnori brings sound, before-sleep practices and autosuggestion into one nighttime system, with a future wake protocol that can continue the routine into morning.';
+---
+<BaseLayout title={title} description={description} canonical="/bedtime-routine-app" type="software">
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Bedtime Routine App</div>
+      <p class="eyebrow">Before-sleep routine</p>
+      <h1>Build a Bedtime Routine That Belongs to the Whole Night</h1>
+      <p class="lead">Music, calming sound, a practice and autosuggestion do not need to live in separate apps. Somnori brings them into the same system that stays useful after you fall asleep.</p>
+      <div class="actions">
+        <a class="button primary" href="#routine">See the routine layer</a>
+        <a class="button secondary" href="/sleep-affirmations-app">Autosuggestion & affirmations</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight" id="routine">
+    <div class="article-shell wide">
+      <div class="loop">
+        <div class="loop-item"><b>Settle</b><span>Choose calm sound or music.</span></div>
+        <div class="loop-item"><b>Practice</b><span>Use a short before-sleep exercise or intention.</span></div>
+        <div class="loop-item"><b>Autosuggestion</b><span>Play a personal phrase or guided audio.</span></div>
+        <div class="loop-item"><b>Night</b><span>Leave Somnori ready for time, alarm and capture.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <SeoProductBridge
+    eyebrow="Routine layer"
+    title="The bedtime routine is one part of a larger night protocol."
+    text="Somnori connects what you do before sleep with what you may need later: hands-free night utilities, thought capture, dream capture and Morning. The product direction is continuity, not another isolated relaxation player."
+    focus="Bedtime routine"
+    variant="routine"
+  />
+
+  <article class="article-shell prose section-tight">
+    <h2>What makes a bedtime routine app useful?</h2>
+    <p>A checklist can help you remember habits. A sound app can play rain. A meditation app can guide a session. Somnori's angle is different: the routine is the <strong>entry point into the night system</strong>, not a standalone activity that ends when the track stops.</p>
+
+    <h2>The routine can be simple</h2>
+    <p>A useful sequence does not need ten steps. For example:</p>
+    <ol>
+      <li>start a calm soundscape;</li>
+      <li>play or read a short practice;</li>
+      <li>use a personal autosuggestion or intention;</li>
+      <li>leave Night Assistant ready;</li>
+      <li>go to sleep without opening another app.</li>
+    </ol>
+
+    <h2>What is already part of Somnori's before-sleep layer</h2>
+    <ul>
+      <li>calm music and nature audio;</li>
+      <li>before-sleep practices;</li>
+      <li>autosuggestion / intention audio;</li>
+      <li>night mode that continues after the before-sleep phase.</li>
+    </ul>
+    <p>The public site should only describe exact sequencing controls as available once the final UI and behavior are verified in the release build.</p>
+
+    <h2>Bedtime routine vs. sleep content library</h2>
+    <table class="compare-table">
+      <thead><tr><th>Need</th><th>Large sleep library</th><th>Somnori direction</th></tr></thead>
+      <tbody>
+        <tr><td>Many sounds / sessions</td><td>Often a major strength</td><td>Smaller, intentional set</td></tr>
+        <tr><td>Personal sequence</td><td>Varies by app</td><td>Core product direction</td></tr>
+        <tr><td>Night utilities after falling asleep</td><td>Usually separate</td><td>Same night system</td></tr>
+        <tr><td>Capture a thought or dream later</td><td>Usually separate</td><td>Same Night Assistant</td></tr>
+        <tr><td>Wake protocol</td><td>Varies</td><td>Planned next layer</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Why Somnori should not become a giant sleep-content catalog</h2>
+    <p>The product does not need thousands of meditations to be useful. The stronger idea is a personal protocol: a smaller set of sound, practices and suggestions that you actually choose, combined with the night functions you use after the lights are off.</p>
+
+    <h2>Morning belongs to the same design</h2>
+    <p>The next product layer is a configurable wake protocol: alarm, chosen sound, a morning cue or autosuggestion, then a transition into Morning. That sequence is not presented as a shipped function yet. It is the natural continuation of the same protocol model.</p>
+
+    <h2>No medical promise</h2>
+    <p>Somnori can support a personal routine, reflection and relaxation practice. It is not a treatment for insomnia or another sleep disorder, and the site should not promise that a specific routine, sound or suggestion will produce a medical outcome.</p>
+
+    <h2>Related Somnori layers</h2>
+    <p>For the suggestion component, see <a href="/sleep-affirmations-app">sleep affirmations and autosuggestion</a>. For the hands-free functions that remain useful after you fall asleep, see <a href="/voice-alarm-at-night">voice alarm and time at night</a>.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">One night system</p>
+      <h2>Prepare the night. Do not end the product at bedtime.</h2>
+      <p class="lead">Somnori connects the before-sleep routine to the hands-free night and, eventually, to a personal wake protocol.</p>
+      <div class="actions"><a class="button primary" href="/#routine">See the bedtime layer</a></div>
+    </div>
+  </section>
+</BaseLayout>
