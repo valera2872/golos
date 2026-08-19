@@ -1,0 +1,100 @@
+---
+import type { SiteCopy } from '../i18n/site';
+
+interface Props {
+  variant: 'night' | 'morning' | 'signs' | 'sleep';
+  copy: SiteCopy['phone'];
+  class?: string;
+}
+
+const { variant, copy, class: className = '' } = Astro.props;
+---
+<div class={`phone-shell ${className}`} aria-hidden="true">
+  <div class="phone-frame">
+    <div class="phone-speaker"></div>
+    <div class="phone-screen">
+      {variant === 'night' && (
+        <div class="screen-content night-screen">
+          <div class="phone-status"><span>03:17</span><span>◔ 82%</span></div>
+          <div class="moon-orbit"><span class="mini-moon"></span></div>
+          <p class="screen-eyebrow">SOMNORI</p>
+          <h3>{copy.nightTitle}</h3>
+          <div class="status-pill"><span class="pulse-dot"></span>{copy.waiting}</div>
+          <div class="night-command">
+            <span>{copy.heard}</span>
+            <strong>{copy.recording}</strong>
+            <div class="phone-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="audio-saved">✓ {copy.original}</div>
+        </div>
+      )}
+
+      {variant === 'morning' && (
+        <div class="screen-content morning-screen">
+          <div class="phone-status"><span>08:06</span><span>◔ 76%</span></div>
+          <p class="screen-eyebrow">SOMNORI</p>
+          <h3>{copy.morningTitle}</h3>
+          <p class="screen-muted">{copy.morningSub}</p>
+          <div class="morning-summary">
+            <div><b>2</b><span>dreams</span></div>
+            <div><b>1</b><span>note</span></div>
+            <div><b>03:17</b><span>first entry</span></div>
+          </div>
+          <div class="dream-row">
+            <span class="dream-time">03:17</span>
+            <div><strong>{copy.dreamOne}</strong><small>0:58 · voice</small></div>
+            <span>›</span>
+          </div>
+          <div class="dream-row">
+            <span class="dream-time">05:42</span>
+            <div><strong>{copy.dreamTwo}</strong><small>0:31 · voice</small></div>
+            <span>›</span>
+          </div>
+          <button class="fake-button">{copy.review}</button>
+        </div>
+      )}
+
+      {variant === 'signs' && (
+        <div class="screen-content signs-screen">
+          <div class="phone-status"><span>10:24</span><span>◔ 68%</span></div>
+          <p class="screen-eyebrow">SOMNORI</p>
+          <h3>{copy.signsTitle}</h3>
+          <p class="screen-muted">{copy.recurring}</p>
+          <div class="sign-card large-sign">
+            <div class="sign-visual station-lines"></div>
+            <div><strong>{copy.signOne}</strong><small>7× · 5 weeks</small></div>
+          </div>
+          <div class="sign-grid">
+            <div class="sign-card"><span class="sign-icon">⌂</span><strong>{copy.signTwo}</strong><small>5×</small></div>
+            <div class="sign-card"><span class="sign-icon">≈</span><strong>{copy.signThree}</strong><small>4×</small></div>
+          </div>
+          <div class="trend-line"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      )}
+
+      {variant === 'sleep' && (
+        <div class="screen-content sleep-screen">
+          <div class="phone-status"><span>23:08</span><span>◔ 91%</span></div>
+          <p class="screen-eyebrow">SOMNORI</p>
+          <h3>{copy.sleepTitle}</h3>
+          <div class="sleep-card featured">
+            <span class="sleep-icon">✦</span>
+            <div><small>Practice</small><strong>{copy.practice}</strong></div>
+            <span>›</span>
+          </div>
+          <div class="sleep-card">
+            <span class="sleep-icon">☾</span>
+            <div><small>Story</small><strong>{copy.story}</strong></div>
+            <span>›</span>
+          </div>
+          <div class="sleep-card">
+            <span class="sleep-icon">♬</span>
+            <div><small>Sound</small><strong>{copy.sound}</strong></div>
+            <span>›</span>
+          </div>
+          <div class="ready-bar"><span class="pulse-dot"></span>{copy.ready}</div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
