@@ -1,0 +1,93 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Dream Journal App for Voice Capture, Recall & Dream History | Somnori';
+const description = 'Somnori is a dream journal built around the full night: voice capture, original audio, morning review and a growing personal dream history on Android.';
+---
+<BaseLayout title={title} description={description} canonical="/dream-journal" type="software">
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / Dream Journal</div>
+      <p class="eyebrow">Dream journal</p>
+      <h1>A Dream Journal Designed Around the Night Itself</h1>
+      <p class="lead">A journal should not begin only after you are fully awake. Somnori connects the moment of capture to the morning review and, over time, to your own recurring dream history.</p>
+      <div class="actions">
+        <a class="button primary" href="/voice-dream-journal">Explore voice capture</a>
+        <a class="button secondary" href="/remember-dreams">Improve dream recall</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight">
+    <div class="article-shell wide">
+      <div class="loop">
+        <div class="loop-item"><b>Evening</b><span>Prepare the night, sound or intention.</span></div>
+        <div class="loop-item"><b>Night</b><span>Capture dreams and thoughts with less screen interaction.</span></div>
+        <div class="loop-item"><b>Morning</b><span>Review the night's entries while fully awake.</span></div>
+        <div class="loop-item"><b>History</b><span>Build a personal archive that can reveal recurring context.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <article class="article-shell prose section-tight">
+    <h2>What should a modern dream journal actually solve?</h2>
+    <p>Most dream journals are good at storing an entry once you have already managed to capture it. The harder problem comes earlier: remembering enough of the dream while you are half awake and getting it into the journal without replacing it with the interface itself.</p>
+    <p>Somnori therefore treats capture, morning review and long-term history as one product loop rather than separate features.</p>
+
+    <h2>Night capture first</h2>
+    <p>The core workflow is voice-first. A dream does not need to be written as an essay. It can begin as a rough audio entry: a room, a person, an impossible event, a feeling. The original recording remains valuable because it preserves how you described the dream before editing or reinterpretation.</p>
+    <p>If you want the specific workflow, see the <a href="/hands-free-dream-journal">hands-free dream journal</a> page. If you are comparing voice with typing, see the <a href="/voice-dream-journal">voice dream journal</a>.</p>
+
+    <h2>Morning is a different job</h2>
+    <p>At night, the interface should demand as little attention as possible. In the morning, you can afford context: what was recorded, when it happened, which entries were dreams, and what you still want to add.</p>
+    <p>The current Somnori Morning screen is the first implementation of this separation. It brings together the latest completed night and the dream entries that can be reviewed after waking.</p>
+
+    <h2>From entries to recurring context</h2>
+    <p>A single dream can be interesting. A history of dreams can be more useful because recurring people, places, emotions and impossible situations begin to have personal context.</p>
+    <p>Somnori already has the beginnings of recurring dream-sign tracking. The larger Dream Intelligence layer is still a roadmap item, and this site will distinguish shipped features from planned ones.</p>
+
+    <h2>Dream signs and lucid dreaming</h2>
+    <p>For lucid dreamers, recurring cues can become practical dream signs. A personalized system can eventually suggest reality-check or induction practice based on what actually appears in your own journal rather than a generic list of symbols.</p>
+    <p>This is the direction behind Somnori's lucid layer: personal history first, technique second.</p>
+
+    <h2>What about AI dream interpretation?</h2>
+    <p>AI can help summarize, ask reflection questions and surface possible themes. It should not pretend that a universal symbol dictionary can diagnose the meaning of a dream. Somnori's planned AI layer is intended to be cautious, contextual and grounded in the user's own history.</p>
+    <p>A one-off AI interpreter can be a useful tool. It is not the product moat.</p>
+
+    <h2>Privacy matters more here than in a normal notes app</h2>
+    <p>Dreams can include intimate material about relationships, fears, sexuality, health and private memories. That makes data handling a product feature, not just a legal footer.</p>
+    <p>Somnori's direction is local-first where practical, with explicit export/delete controls and clear explanations of what leaves the device. We will only publish specific privacy claims once they are verified in the shipped implementation.</p>
+
+    <h2>Somnori vs. a generic notes app</h2>
+    <table class="compare-table">
+      <thead><tr><th>Need</th><th>Generic notes app</th><th>Somnori</th></tr></thead>
+      <tbody>
+        <tr><td>Write a daytime note</td><td>Excellent</td><td>Possible, but not the core job</td></tr>
+        <tr><td>Capture a dream while half asleep</td><td>Usually manual navigation</td><td>Night-specific voice workflow</td></tr>
+        <tr><td>Keep original dream audio</td><td>Depends on app</td><td>Part of the dream entry workflow</td></tr>
+        <tr><td>Morning review of one night</td><td>Folder/list based</td><td>Dedicated Morning experience</td></tr>
+        <tr><td>Dream signs / lucid layer</td><td>Not dream-specific</td><td>Dream-specific product direction</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Who Somnori is for</h2>
+    <ul>
+      <li>People who want a dream journal but dislike typing immediately after waking.</li>
+      <li>People who wake during the night and want to preserve dreams without fully engaging with the phone.</li>
+      <li>People interested in recurring dream patterns rather than isolated dictionary meanings.</li>
+      <li>Lucid dreamers who want their practice connected to their own journal history.</li>
+    </ul>
+
+    <h2>The journal is the memory layer</h2>
+    <p>Time, alarms, music and nighttime utility commands are useful conveniences. They are not the reason Somnori exists. The core product is the memory layer that connects your night to your morning and, eventually, to the patterns that emerge across many nights.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">Start with capture</p>
+      <h2>The first useful dream is the one you actually save.</h2>
+      <p class="lead">See how Somnori reduces the interaction between waking from a dream and recording it.</p>
+      <div class="actions"><a class="button primary" href="/hands-free-dream-journal">Hands-free dream capture</a></div>
+    </div>
+  </section>
+</BaseLayout>
