@@ -1,8 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import SeoProductBridge from '../components/SeoProductBridge.astro';
+import '../styles/v23.css';
 
 const title = 'Hands-Free Dream Journal for Android | Record Without Unlocking | Somnori';
-const description = 'Record a dream with minimal screen interaction: wake, say your Somnori phrase, speak the dream, and return to sleep. Android-first hands-free dream capture.';
+const description = 'Record a dream with minimal screen interaction: wake, say your Somnori phrase, speak the dream, and return to sleep inside a broader hands-free night system.';
 ---
 <BaseLayout title={title} description={description} canonical="/hands-free-dream-journal" type="software">
   <section class="article-hero">
@@ -10,7 +12,7 @@ const description = 'Record a dream with minimal screen interaction: wake, say y
       <div class="breadcrumbs"><a href="/">Somnori</a> / Hands-Free Dream Journal</div>
       <p class="eyebrow">Hands-free night capture</p>
       <h1>Record a Dream Without Unlocking Your Phone</h1>
-      <p class="lead">Wake. Say your Somnori phrase. Speak the dream with your eyes closed. Return to sleep instead of navigating through a bright screen.</p>
+      <p class="lead">Wake. Say your Somnori phrase. Speak the dream with your eyes closed. Return to sleep instead of navigating through the phone.</p>
       <div class="actions">
         <a class="button primary" href="#how-it-works">How it works</a>
         <a class="button secondary" href="/voice-dream-journal">Voice journal overview</a>
@@ -21,58 +23,75 @@ const description = 'Record a dream with minimal screen interaction: wake, say y
   <section class="section-tight" id="how-it-works">
     <div class="article-shell wide">
       <div class="flow">
-        <div class="flow-step"><div class="flow-number">1</div><h3>Wake from a dream</h3><p class="muted">Hold onto the first fragment instead of reaching for menus.</p></div>
-        <div class="flow-step"><div class="flow-number">2</div><h3>Say your phrase</h3><p class="muted">The night assistant is designed to wait for a voice command.</p></div>
-        <div class="flow-step"><div class="flow-number">3</div><h3>Speak naturally</h3><p class="muted">Tell the dream as it comes back—complete or incomplete.</p></div>
-        <div class="flow-step"><div class="flow-number">4</div><h3>Go back to sleep</h3><p class="muted">Review the night's entries in Morning when you are awake.</p></div>
+        <div class="flow-step"><div class="flow-number">1</div><h3>Wake</h3><p class="muted">Hold onto the first fragment instead of looking for an app.</p></div>
+        <div class="flow-step"><div class="flow-number">2</div><h3>Say your phrase</h3><p class="muted">Use the Night Assistant rather than navigating the screen.</p></div>
+        <div class="flow-step"><div class="flow-number">3</div><h3>Speak naturally</h3><p class="muted">Tell the dream as it comes back, complete or incomplete.</p></div>
+        <div class="flow-step"><div class="flow-number">4</div><h3>Sleep again</h3><p class="muted">Leave reading and organizing for Morning.</p></div>
       </div>
     </div>
   </section>
 
+  <SeoProductBridge
+    focus="Hands-free night capture"
+    variant="capture"
+    title="The same hands-free layer is useful even when the thing you need is not a dream."
+    text="Somnori's night mode is also designed for a sudden thought or idea, asking the time, and working with an alarm without turning the phone into a fully awake task. Dream capture is one focused use of that night interface."
+  />
+
   <article class="article-shell prose section-tight">
     <h2>What “hands-free” means here</h2>
-    <p>Somnori's core nighttime mode is built around voice activation rather than a sequence of taps. The goal is not to remove every Android permission or system constraint; it is to remove the repeated interaction that normally happens after you wake from a dream.</p>
-    <p>That distinction matters. A phone may still need to be prepared for the night, permissions may need to be granted, and Android battery settings can affect long-running background behavior. Once the night mode is ready, the capture flow is designed to be voice-driven.</p>
+    <p>Somnori's nighttime mode is built around voice activation rather than a sequence of taps. The goal is not to pretend Android has no permissions, battery policies or setup constraints. The goal is to remove repeated interaction once the night mode is prepared.</p>
+    <p>A phone may still need to be configured before bed. Once the Night Assistant is ready, the core nighttime actions are designed to be voice-driven.</p>
 
     <h2>Is Somnori the only app that records dreams at night?</h2>
     <p>No. That would be an inaccurate claim.</p>
-    <p>Other products already reduce nighttime friction in different ways. Some iPhone dream recorders market one-tap or lock-screen capture; newer products also use darkness, silence detection or eyes-closed voice recording as part of their workflow. Somnori's specific direction is an <strong>Android-first wake-phrase workflow</strong> tied to a broader night assistant and Morning review.</p>
+    <p>Other products already reduce nighttime friction in different ways: taps from the lock screen, dark recording modes, voice capture and other low-interaction workflows. Somnori's direction is an <strong>Android-first voice-triggered night system</strong> that connects capture with useful night commands, before-sleep preparation and Morning.</p>
 
     <div class="card" style="margin:40px 0">
-      <span class="kicker">The comparison that matters</span>
-      <h3 style="margin-top:12px">One tap is good. Zero navigation is the goal.</h3>
-      <p class="muted">The useful question is not whether a competitor is “hands-free” by a marketing definition. It is how many deliberate actions you need to take between remembering the dream and speaking it.</p>
+      <span class="kicker">The useful comparison</span>
+      <h3 style="margin-top:12px">Count deliberate actions, not marketing labels.</h3>
+      <p class="muted">The question is how much attention you have to give the phone between “I need to save this” and “it is safely captured.”</p>
     </div>
 
     <h2>Why the screen can be the problem</h2>
-    <p>A dream can return as a fragile chain of images. Looking at notifications, reading interface text or deciding which button to press creates competing attention at exactly the wrong time. Somnori therefore treats the dark, half-awake state as a design constraint rather than an edge case.</p>
-    <p>This is also why the product keeps utility commands such as time and alarm inside the night assistant: they are conveniences that reduce reasons to open the phone. They are not the main reason to install Somnori.</p>
+    <p>A dream can return as a fragile chain of images. A new idea can be equally fragile. Looking at notifications, reading interface text or deciding which button to press creates competing attention at exactly the wrong time.</p>
+    <p>Somnori treats the half-awake state as a design constraint rather than an edge case. The interface should help you complete the task and then leave.</p>
 
-    <h2>What happens after the recording</h2>
-    <p>The nighttime entry belongs to the night. In the current Morning experience, saved dreams and other entries can be reviewed together after waking. That allows Somnori to separate two jobs:</p>
+    <h2>Time and alarm are not side decorations</h2>
+    <p>For many nighttime users, asking “what time is it?” without opening their eyes is valuable in its own right. The same is true of setting or changing an alarm by voice. These commands may also be available in general assistants, but inside Somnori they belong to one prepared night context.</p>
+    <p>That distinction matters: Somnori is not claiming ownership of the alarm or clock command. It is combining them with capture and the rest of the night workflow so the user has fewer reasons to leave that context.</p>
+
+    <div class="product-scope-grid">
+      <div><b>Capture</b><span>Thoughts, ideas and dreams without starting a normal notes session.</span></div>
+      <div><b>Night utilities</b><span>Ask the time and work with the alarm by voice.</span></div>
+      <div><b>Routine</b><span>Enter the night with sound, practices and autosuggestion already chosen.</span></div>
+    </div>
+
+    <h2>What happens after a dream recording</h2>
+    <p>The dream entry belongs to the night. In Morning, saved dreams and other entries can be reviewed together after waking. That deliberately separates two jobs:</p>
     <ul>
-      <li><strong>At night:</strong> preserve the memory with minimum friction.</li>
+      <li><strong>At night:</strong> preserve what matters with minimum friction.</li>
       <li><strong>In the morning:</strong> read, add details, review and organize.</li>
     </ul>
 
     <h2>What we are testing on Android</h2>
-    <p>Hands-free night capture is only valuable if it survives real phones, real battery policies and long periods with the screen off. Somnori's Android work therefore treats background reliability, wake-phrase detection, recording completion and alarm behavior as product infrastructure—not demo features.</p>
-    <p>The website will not claim that every device behaves identically. Device-specific setup guidance will be added as the public Android release expands.</p>
+    <p>Hands-free night behavior is only valuable if it survives real devices, screen-off time and Android background constraints. Somnori therefore treats wake-phrase detection, recording completion and alarm behavior as product infrastructure rather than demo features.</p>
+    <p>The public site will not claim identical behavior on every Android device. Device-specific setup guidance can grow with the public release.</p>
 
-    <h2>Hands-free capture vs. Gemini or Google Assistant</h2>
-    <p>General assistants can answer the time, set alarms and create notes. Those are useful utilities, and Somnori does not need to beat Google at being a general assistant.</p>
-    <p>The specialized job is different: capture a dream in the middle of the night, preserve it as part of a dream history, and continue the workflow the next morning. That is the layer Somnori is designed around.</p>
+    <h2>Hands-free Somnori vs. a general assistant</h2>
+    <p>General assistants can answer the time, set alarms and create notes. Somnori does not need to beat a platform assistant at general knowledge or universal phone control.</p>
+    <p>The specialized value is the <strong>prepared nighttime workflow</strong>: capture what arrived, keep night utilities close, connect bedtime practices and autosuggestion, and carry the relevant material into Morning. That combination is the product layer.</p>
 
     <h2>Related guides</h2>
-    <p>For the broader category, see <a href="/voice-dream-journal">voice dream journal</a>. If your main problem is losing the memory itself, start with <a href="/remember-dreams">how to remember dreams</a>.</p>
+    <p>For the broader dream-voice category, see <a href="/voice-dream-journal">voice dream journal</a>. If your main problem is losing the memory itself, start with <a href="/remember-dreams">how to remember dreams</a>. To see Somnori beyond dreams, return to the <a href="/#system">full night system</a>.</p>
   </article>
 
   <section class="section-tight">
     <div class="article-shell wide callout">
-      <p class="eyebrow">The Somnori rule</p>
-      <h2>Capture now. Think about it in the morning.</h2>
-      <p class="lead">The night interface should ask as little of you as possible. The morning interface can do the rest.</p>
-      <div class="actions"><a class="button primary" href="/dream-journal">See the night-to-morning journal</a></div>
+      <p class="eyebrow">The Somnori principle</p>
+      <h2>Do the nighttime job without turning it into a daytime task.</h2>
+      <p class="lead">Capture, ask, set, then return to sleep. The richer interface can wait until you actually want it.</p>
+      <div class="actions"><a class="button primary" href="/dream-journal">See the dream-journal layer</a></div>
     </div>
   </section>
 </BaseLayout>
