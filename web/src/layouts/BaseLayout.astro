@@ -1,5 +1,8 @@
 ---
 import '../styles/global.css';
+import { copy, homePath, localeMeta, locales, type Locale } from '../i18n/site';
+
+interface Alternate { lang: string; href: string }
 
 interface Props {
   title: string;
@@ -7,6 +10,8 @@ interface Props {
   canonical?: string;
   type?: 'website' | 'article' | 'software';
   noindex?: boolean;
+  locale?: Locale;
+  alternates?: Alternate[];
 }
 
 const {
@@ -15,11 +20,16 @@ const {
   canonical = Astro.url.pathname,
   type = 'website',
   noindex = false,
+  locale = 'en',
+  alternates = [],
 } = Astro.props;
 
 const site = 'https://somnori.com';
 const canonicalUrl = new URL(canonical, site).toString();
 const ogType = type === 'article' ? 'article' : 'website';
+const t = copy[locale];
+const base = homePath(locale);
+const anchor = (id: string) => `${base}#${id}`;
 
 const organizationSchema = {
   '@context': 'https://schema.org',
@@ -39,7 +49,7 @@ const softwareSchema = type === 'software' ? {
 } : null;
 ---
 <!doctype html>
-<html lang="en">
+<html lang={locale}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -47,28 +57,43 @@ const softwareSchema = type === 'software' ? {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
+    {alternates.map((alternate) => (
+      <link rel="alternate" hreflang={alternate.lang} href={new URL(alternate.href, site).toString()} />
+    ))}
+    {alternates.length > 0 && <link rel="alternate" hreflang="x-default" href={`${site}/`} />}
     {noindex && <meta name="robots" content="noindex,follow" />}
     <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="Somnori" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:locale" content={locale} />
+    <meta name="twitter:card" content="summary_large_image" />
     <script type="application/ld+json" set:html={JSON.stringify(organizationSchema)} />
     {softwareSchema && <script type="application/ld+json" set:html={JSON.stringify(softwareSchema)} />}
   </head>
   <body>
-    <a class="skip-link" href="#content">Skip to content</a>
+    <a class="skip-link" href="#content">{t.skip}</a>
     <header class="site-header">
       <div class="nav-shell">
-        <a class="brand" href="/" aria-label="Somnori home"><span class="brand-mark">◐</span>Somnori</a>
+        <a class="brand" href={base} aria-label="Somnori home"><span class="brand-mark">◐</span>Somnori</a>
         <nav class="main-nav" aria-label="Main navigation">
-          <a href="/voice-dream-journal">Voice journal</a>
-          <a href="/hands-free-dream-journal">Hands-free</a>
-          <a href="/remember-dreams">Remember dreams</a>
-          <a href="/dream-journal">Dream journal</a>
-          <a class="nav-cta" href="/#early-access">Android app</a>
+          <a href={anchor('product')}>{t.nav.product}</a>
+          <a href={anchor('how-it-works')}>{t.nav.how}</a>
+          <a href={anchor('morning')}>{t.nav.morning}</a>
+          <a href={anchor('learn')}>{t.nav.learn}</a>
         </nav>
+        <details class="language-switcher">
+          <summary aria-label={t.nav.language}><span class="globe">◎</span>{localeMeta[locale].native}<span class="chevron">⌄</span></summary>
+          <div class="language-menu">
+            {locales.map((lang) => (
+              <a class={lang === locale ? 'active' : ''} href={localeMeta[lang].path} lang={lang} hreflang={lang}>
+                <span>{localeMeta[lang].native}</span><b>{localeMeta[lang].label}</b>
+              </a>
+            ))}
+          </div>
+        </details>
+        <a class="nav-cta" href={anchor('app')}>{t.nav.app}</a>
       </div>
     </header>
     <main id="content">
@@ -76,39 +101,48 @@ const softwareSchema = type === 'software' ? {
     </main>
     <footer class="site-footer">
       <div class="shell">
-        <div class="footer-grid">
+        <div class="footer-grid footer-grid-v2">
           <div>
             <div class="brand"><span class="brand-mark">◐</span>Somnori</div>
-            <p class="footer-copy">A nighttime dream journal for capturing what you remember before it disappears.</p>
+            <p class="footer-copy">{t.footer.tagline}</p>
           </div>
           <div>
-            <div class="footer-title">Product</div>
+            <div class="footer-title">{t.footer.product}</div>
             <div class="footer-links">
-              <a href="/voice-dream-journal">Voice Dream Journal</a>
-              <a href="/hands-free-dream-journal">Hands-Free Capture</a>
-              <a href="/dream-journal">Dream Journal</a>
+              <a href={anchor('how-it-works')}>{t.nav.how}</a>
+              <a href={anchor('morning')}>{t.nav.morning}</a>
+              <a href={anchor('learn')}>{t.nav.learn}</a>
             </div>
           </div>
           <div>
-            <div class="footer-title">Learn</div>
+            <div class="footer-title">{t.footer.learn}</div>
             <div class="footer-links">
-              <a href="/remember-dreams">How to Remember Dreams</a>
-              <a href="/#night-to-morning">Night to Morning</a>
-              <a href="/#privacy">Privacy principles</a>
+              {locale === 'en' ? (
+                <>
+                  <a href="/remember-dreams">How to Remember Dreams</a>
+                  <a href="/voice-dream-journal">Voice Dream Journal</a>
+                  <a href="/hands-free-dream-journal">Hands-Free Capture</a>
+                </>
+              ) : (
+                <>
+                  <a href={anchor('product')}>{t.nav.product}</a>
+                  <a href={anchor('learn')}>{t.signs.eyebrow}</a>
+                  <a href={anchor('privacy')}>{t.privacy.eyebrow}</a>
+                </>
+              )}
             </div>
           </div>
           <div>
-            <div class="footer-title">Somnori</div>
+            <div class="footer-title">{t.footer.legal}</div>
             <div class="footer-links">
-              <a href="/#early-access">Android release</a>
-              <a href="/privacy">Privacy</a>
-              <a href="/terms">Terms</a>
+              <a href="/privacy">{t.footer.privacy}</a>
+              <a href="/terms">{t.footer.terms}</a>
             </div>
           </div>
         </div>
         <div class="footer-bottom">
           <span>© {new Date().getFullYear()} Somnori</span>
-          <span>English site · Russian version planned after the English launch is validated.</span>
+          <span>{t.footer.global}</span>
         </div>
       </div>
     </footer>
