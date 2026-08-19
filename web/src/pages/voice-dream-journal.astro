@@ -1,8 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import SeoProductBridge from '../components/SeoProductBridge.astro';
+import '../styles/v23.css';
 
 const title = 'Voice Dream Journal for Android | Record Dreams Before They Fade | Somnori';
-const description = 'A voice dream journal designed for the middle of the night: capture dreams by speaking, keep the original audio, and review the night in the morning.';
+const description = 'A voice dream journal designed for the middle of the night: speak before a dream fades, keep the original audio, and return to the entry in the morning.';
 ---
 <BaseLayout title={title} description={description} canonical="/voice-dream-journal" type="software">
   <section class="article-hero">
@@ -10,36 +12,53 @@ const description = 'A voice dream journal designed for the middle of the night:
       <div class="breadcrumbs"><a href="/">Somnori</a> / Voice Dream Journal</div>
       <p class="eyebrow">Voice dream journal</p>
       <h1>A Voice Dream Journal Built for the Middle of the Night</h1>
-      <p class="lead">Speaking is easy. The hard part is capturing a dream before opening a normal app wakes you up enough to lose it. Somnori is built around that exact moment.</p>
+      <p class="lead">A dream can disappear while you are still deciding where to write it. Somnori is designed to let you speak first, stay close to sleep, and leave the organizing for morning.</p>
       <div class="actions">
         <a class="button primary" href="/hands-free-dream-journal">See hands-free capture</a>
-        <a class="button secondary" href="/dream-journal">See the full journal loop</a>
+        <a class="button secondary" href="/dream-journal">See the dream-journal layer</a>
       </div>
     </div>
   </section>
 
   <section class="section-tight">
     <div class="article-shell wide proof-strip">
-      <div class="proof-item"><b>Speak naturally</b><span>No need to compose polished text at night.</span></div>
-      <div class="proof-item"><b>Keep original audio</b><span>Your voice remains part of the entry.</span></div>
-      <div class="proof-item"><b>Review in Morning</b><span>Return to the night's entries after waking.</span></div>
-      <div class="proof-item"><b>Android-first</b><span>The night flow is being tested on real devices.</span></div>
+      <div class="proof-item"><b>Speak naturally</b><span>Fragments are enough at night.</span></div>
+      <div class="proof-item"><b>Keep original audio</b><span>Your first wording stays with the entry.</span></div>
+      <div class="proof-item"><b>Return in Morning</b><span>Review when you are actually awake.</span></div>
+      <div class="proof-item"><b>Part of Somnori</b><span>The same night system can also capture thoughts and ideas.</span></div>
     </div>
   </section>
 
+  <SeoProductBridge
+    focus="Voice dream capture"
+    variant="capture"
+    title="Dream recording is one use of the same nighttime capture system."
+    text="This page is intentionally about dream journaling. Somnori itself is broader: the hands-free night layer is also designed for thoughts and ideas, asking the time, voice alarms, before-sleep routines and the morning that follows."
+  />
+
   <article class="article-shell prose section-tight">
     <h2>Why voice works differently at 3AM</h2>
-    <p>A traditional dream journal assumes you are awake enough to unlock a phone, find the right screen, type coherent sentences and decide when you are finished. That is a reasonable daytime workflow. It is a poor nighttime one.</p>
+    <p>A traditional dream journal assumes you are awake enough to unlock a phone, find the right screen, type coherent sentences and decide when you are finished. That can be a reasonable daytime workflow. It is often a poor nighttime one.</p>
     <p>With a voice dream journal, you can record incomplete fragments in the order they return: a place, a face, a feeling, a sentence. The entry does not have to be elegant. It only has to preserve enough of the dream for your morning self.</p>
 
-    <h2>Voice recording is not the unique part</h2>
-    <p>Several dream-journal products already support voice. General assistants and voice memo apps can also capture speech. Somnori does not treat the microphone as the differentiator.</p>
-    <p>The differentiator we are building around is the <strong>night workflow</strong>: capture with as little screen interaction as possible, keep the original recording, attach it to the night, then continue the process in Morning instead of forcing you to finish everything while half asleep.</p>
+    <h2>Voice recording is not the differentiator by itself</h2>
+    <p>Dream-journal apps, general assistants and voice memo apps can all record speech. Somnori therefore does not treat the microphone as the product.</p>
+    <p>The product is the <strong>night workflow around the microphone</strong>: reduce deliberate interaction, preserve the original recording, keep it inside the context of the night, then continue the process in Morning instead of forcing you to finish everything while half asleep.</p>
 
     <div class="callout" style="margin:46px 0">
-      <p class="eyebrow">Somnori workflow</p>
-      <h2 style="margin-bottom:14px">Wake → capture → sleep → review</h2>
-      <p class="lead" style="margin-bottom:0">The journal starts before you are fully awake and continues after you are.</p>
+      <p class="eyebrow">Dream-capture workflow</p>
+      <h2 style="margin-bottom:14px">Wake → speak → sleep again → review</h2>
+      <p class="lead" style="margin-bottom:0">The capture begins while the memory is fragile. The journal can become readable later.</p>
+    </div>
+
+    <h2>The same capture layer can save more than dreams</h2>
+    <p>Some people wake because of a dream. Others surface from sleep with a sentence, a solution, a business idea or a thought they are certain they will remember in the morning—and then do not.</p>
+    <p>Somnori treats those as different kinds of nighttime material, not as different apps. The dream-journal workflow stays dream-specific, while the broader capture system can also preserve a thought or idea without turning on a normal notes workflow.</p>
+
+    <div class="product-scope-grid">
+      <div><b>Dream</b><span>Preserve a scene, feeling or narrative before it fades.</span></div>
+      <div><b>Thought</b><span>Save a sentence or reflection that arrived while falling asleep.</span></div>
+      <div><b>Idea</b><span>Capture a solution, concept or next step without starting the day.</span></div>
     </div>
 
     <h2>Voice dream journal vs. a normal voice memo</h2>
@@ -47,38 +66,38 @@ const description = 'A voice dream journal designed for the middle of the night:
       <thead><tr><th>Need</th><th>Voice memo</th><th>Somnori direction</th></tr></thead>
       <tbody>
         <tr><td>Record speech</td><td>Yes</td><td>Yes</td></tr>
-        <tr><td>Night-specific start flow</td><td>Usually manual</td><td>Designed around the night assistant</td></tr>
-        <tr><td>Dream vs. other night entry</td><td>You organize it later</td><td>Entries belong to the night's context</td></tr>
-        <tr><td>Morning review</td><td>Open a folder/list</td><td>A dedicated Morning view</td></tr>
-        <tr><td>Recurring dream signs</td><td>No dream-specific model</td><td>Part of Somnori's dream-history direction</td></tr>
+        <tr><td>Night-specific start flow</td><td>Usually manual</td><td>Built around the Night Assistant</td></tr>
+        <tr><td>Dream vs. thought</td><td>You organize it later</td><td>Night entries can keep their purpose and context</td></tr>
+        <tr><td>Morning review</td><td>Open a recording list</td><td>A dedicated Morning layer</td></tr>
+        <tr><td>Dream signs</td><td>No dream-specific model</td><td>Connected to the dream-journal layer</td></tr>
       </tbody>
     </table>
 
-    <h2>What Somnori keeps</h2>
-    <p>The current product is designed to preserve the original voice entry rather than replacing it with a generated interpretation. That matters because a transcript can be useful for search, but the original audio contains the hesitations, emphasis and wording you used while the dream was still fresh.</p>
-    <p>Morning is where the night becomes readable: review what was recorded, add what came back after waking, and continue building the journal from there.</p>
+    <h2>What Somnori adds around the recording</h2>
+    <p>Night capture does not live alone. In the same product, nighttime utility commands can reduce reasons to reach for the screen: asking the time or working with the alarm belongs to the same hands-free context. Before sleep, sound, practices and autosuggestion can form the preparation layer. Morning then becomes the place to review what happened overnight.</p>
+    <p>That broader system is important because the value is not “AI can transcribe my voice.” The value is that the night has a prepared workflow before, during and after the moment you need to speak.</p>
 
     <h2>What comes later</h2>
-    <p>Somnori's roadmap extends beyond individual recordings toward long-term dream patterns, personal dream signs and a more personalized lucid-dream layer. Those features should only be described as available when they are actually shipped. The site will keep that boundary explicit.</p>
+    <p>Somnori's dream roadmap extends toward richer pattern detection, personal dream signs and a more personalized lucid-dream layer. A wake protocol that can continue after the alarm is also a product direction. Planned features stay labelled as planned until they are actually shipped.</p>
 
-    <h2>Who this is for</h2>
+    <h2>Who this page is for</h2>
     <ul>
       <li>People who remember dreams briefly and lose them while reaching for a phone.</li>
-      <li>People who prefer speaking to typing when they wake during the night.</li>
-      <li>People building a long-term dream journal rather than collecting isolated interpretations.</li>
-      <li>Lucid dreamers who eventually want recurring signs from their own history to matter.</li>
+      <li>People who prefer speaking to typing after a nighttime awakening.</li>
+      <li>People who want original voice entries rather than only polished text.</li>
+      <li>People who want dream capture to live inside a broader night routine rather than a standalone recorder.</li>
     </ul>
 
-    <h2>Start with less friction</h2>
-    <p>If your real problem is not voice itself but having to touch and unlock the phone, the more specific page is our <a href="/hands-free-dream-journal">hands-free dream journal</a> guide. If you want the broader category view, see the <a href="/dream-journal">Somnori dream journal</a>.</p>
+    <h2>Start with the friction that actually bothers you</h2>
+    <p>If the main problem is touching and unlocking the phone, see the more specific <a href="/hands-free-dream-journal">hands-free dream journal</a> page. If you want the broader dream-journal category, see <a href="/dream-journal">Somnori as a dream journal</a>. For Somnori beyond dreams, return to the <a href="/#system">full night system</a>.</p>
   </article>
 
   <section class="section-tight">
     <div class="article-shell wide callout">
-      <p class="eyebrow">Android release</p>
+      <p class="eyebrow">Android-first</p>
       <h2>Capture first. Organize when you are awake.</h2>
-      <p class="lead">Somnori is in active physical testing. The public download CTA will replace this release note when the Android build is ready for distribution.</p>
-      <div class="actions"><a class="button primary" href="/hands-free-dream-journal">See the no-unlock workflow</a></div>
+      <p class="lead">The current Android work is focused on making nighttime voice capture dependable enough to trust when you do not want to fully wake up.</p>
+      <div class="actions"><a class="button primary" href="/hands-free-dream-journal">See the hands-free workflow</a></div>
     </div>
   </section>
 </BaseLayout>
