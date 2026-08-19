@@ -1,0 +1,18 @@
+.inline-guide-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  margin-top: 22px;
+}
+
+.inline-guide-links .text-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .inline-guide-links {
+    display: grid;
+    gap: 12px;
+  }
+}
