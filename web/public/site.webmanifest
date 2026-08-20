@@ -1,0 +1,16 @@
+{
+  "name": "Somnori",
+  "short_name": "Somnori",
+  "description": "A hands-free night system for thoughts, ideas, alarms, routines and dreams.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#070816",
+  "theme_color": "#070816",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

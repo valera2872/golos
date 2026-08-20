@@ -7,8 +7,33 @@ const alternates = [
   { lang: 'en', href: '/faq' },
   { lang: 'ru', href: '/ru/faq' },
 ];
+const faqEntries = [
+  ['Is Somnori only a dream journal?', 'No. Dreams are an important product layer, but Somnori also captures night thoughts and ideas, can answer the time and work with voice-set alarms, includes before-sleep audio and practices, and is developing toward personal bedtime and wake protocols.'],
+  ['What platform does Somnori support?', 'Somnori is Android-first. The current tested application interface is Russian. An English Android interface is planned after the Russian product reaches a sufficiently stable semi-final state.'],
+  ['Can I use Somnori without touching the phone at night?', 'The Night Assistant is designed around a voice-driven flow after the phone has been prepared for the night. Android permissions, battery policies and device-specific constraints still exist.'],
+  ['Can Somnori tell me the time?', 'Yes. Asking the current time is part of the night assistant logic, reducing the need to look at a bright screen just to check the clock.'],
+  ['Can I set an alarm by voice?', 'Yes. Voice alarm commands are part of the current Android night logic and alarm reliability is tested on real devices.'],
+  ['Does Somnori have a smart alarm?', 'Not in the sleep-stage sense. Somnori currently has a voice/night alarm workflow. A future sleep-stage-aware feature would require real Health Connect or wearable data.'],
+  ['Can I record thoughts and ideas that are not dreams?', 'Yes. A night entry can be a thought, idea, reminder, insight or dream. Somnori preserves the material first and lets you decide what to do with it when you are awake.'],
+  ['What does Somnori do before sleep?', 'The current product direction includes calming music and nature audio, practices and autosuggestion, with a broader goal of a personal bedtime routine.'],
+  ['Can Somnori run an autosuggestion after the alarm?', 'That full wake protocol is a planned next product layer, not a current shipped capability.'],
+  ['Does Somnori interpret dreams with AI?', 'Deeper Dream Intelligence is planned, but Somnori does not currently market a universal AI symbol dictionary as a finished core feature.'],
+  ['Is Somnori available on iPhone?', 'Not currently. The product work is Android-first.'],
+  ['Can I download Somnori now?', 'The Android build is still in active real-device testing and public distribution is being prepared.'],
+  ['What happens to my recordings and dream data?', 'The current website is static and does not accept night recordings or dream uploads. Before public Android distribution, Somnori will publish an implementation-specific app privacy policy.'],
+];
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqEntries.map(([name, text]) => ({
+    '@type': 'Question',
+    name,
+    acceptedAnswer: { '@type': 'Answer', text },
+  })),
+};
 ---
 <BaseLayout title={title} description={description} canonical="/faq" type="article" locale="en" alternates={alternates}>
+  <script type="application/ld+json" set:html={JSON.stringify(faqSchema)} />
   <section class="article-hero">
     <div class="article-shell">
       <div class="breadcrumbs"><a href="/">Somnori</a> / FAQ</div>

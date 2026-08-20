@@ -76,6 +76,8 @@ const effectiveAlternates = alternates.length > 0 ? alternates : (alternatePairs
 const localeHref = (lang: string) => effectiveAlternates.find((alt) => alt.lang === lang)?.href ?? localeMeta[lang as Locale].path;
 const canonicalUrl = normalizeUrl(canonical);
 const ogType = type === 'article' ? 'article' : 'website';
+const ogLocale = locale === 'ru' ? 'ru_RU' : 'en_US';
+const alternateOgLocale = locale === 'ru' ? 'en_US' : 'ru_RU';
 const legacy = copy[locale];
 const publicCopy = isPublicLocale(locale) ? homeV22[locale] : null;
 const base = homePath(locale);
@@ -108,21 +110,27 @@ const softwareSchema = type === 'software' ? {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#070816" />
+    <meta name="color-scheme" content="dark" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? 'noindex,follow' : 'index,follow'} />
     <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/site.webmanifest" />
     {effectiveAlternates.map((alternate) => (
       <link rel="alternate" hreflang={alternate.lang} href={normalizeUrl(alternate.href)} />
     ))}
     {effectiveAlternates.length > 0 && <link rel="alternate" hreflang="x-default" href={`${site}/`} />}
-    {noindex && <meta name="robots" content="noindex,follow" />}
     <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="Somnori" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:locale" content={locale} />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:locale" content={ogLocale} />
+    {effectiveAlternates.length > 1 && <meta property="og:locale:alternate" content={alternateOgLocale} />}
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
     <script type="application/ld+json" set:html={JSON.stringify(organizationSchema)} />
     {softwareSchema && <script type="application/ld+json" set:html={JSON.stringify(softwareSchema)} />}
   </head>
