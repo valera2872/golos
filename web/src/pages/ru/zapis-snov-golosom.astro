@@ -1,0 +1,81 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SeoProductBridge from '../../components/SeoProductBridge.astro';
+
+const title = 'Запись снов голосом ночью | Somnori';
+const description = 'Расскажите сон голосом сразу после пробуждения, сохраните исходное аудио и вернитесь ко сну. Утром запись уже ждёт в Somnori.';
+const alternates = [
+  { lang: 'en', href: '/voice-dream-journal' },
+  { lang: 'ru', href: '/ru/zapis-snov-golosom' },
+];
+---
+<BaseLayout title={title} description={description} canonical="/ru/zapis-snov-golosom" type="software" locale="ru" alternates={alternates}>
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/ru/">Somnori</a> / Запись снов голосом</div>
+      <p class="eyebrow">Голосовой дневник снов</p>
+      <h1>Расскажите сон голосом, пока он ещё не исчез.</h1>
+      <p class="lead">Ночью не нужен красивый текст. Сохраните сцены, фразы и ощущения так, как они возвращаются в память, а разбираться с записью можно уже утром.</p>
+      <div class="actions">
+        <a class="button primary" href="/ru/beskontaktnaya-zapis-snov">Без разблокировки телефона</a>
+        <a class="button secondary" href="/ru/dnevnik-snov">Дневник снов</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight">
+    <div class="article-shell wide proof-strip">
+      <div class="proof-item"><b>Говорите естественно</b><span>Не нужно сразу строить связный рассказ.</span></div>
+      <div class="proof-item"><b>Исходное аудио</b><span>Ваш голос остаётся частью записи.</span></div>
+      <div class="proof-item"><b>Контекст ночи</b><span>Запись не теряется среди обычных голосовых заметок.</span></div>
+      <div class="proof-item"><b>Разбор утром</b><span>Дополняйте сон уже после полного пробуждения.</span></div>
+    </div>
+  </section>
+
+  <SeoProductBridge
+    locale="ru"
+    eyebrow="Ночная запись"
+    title="Сон использует тот же голосовой вход, что мысли и идеи."
+    text="Somnori строится не вокруг одного диктофона, а вокруг ночного контекста. Голосом можно сохранить сон, мысль или идею, а время и будильник остаются рядом в том же Ночном помощнике."
+    focus="Запись сна голосом"
+    variant="capture"
+  />
+
+  <article class="article-shell prose section-tight">
+    <h2>Почему голос удобен именно ночью</h2>
+    <p>Сон редко возвращается в память как готовый рассказ. Чаще это отдельные сцены, лица, ощущения и фразы. Голос позволяет перечислить их в том порядке, в котором они вспоминаются, не тратя внимание на клавиатуру и редактуру.</p>
+
+    <h2>Голосовая запись уже не уникальная функция</h2>
+    <p>На рынке дневников снов всё больше приложений поддерживают диктовку или преобразование речи в текст. Поэтому Somnori не строит отличие только на микрофоне. Важнее весь сценарий: ночной режим, минимальное взаимодействие с телефоном, исходное аудио и продолжение утром.</p>
+
+    <h2>Зачем сохранять исходный голос</h2>
+    <p>Транскрипция удобна для поиска и чтения, но исходная запись сохраняет интонацию, паузы и точные слова, которыми вы описывали сон сразу после пробуждения. Она остаётся первичным материалом, а не заменяется интерпретацией.</p>
+
+    <h2>Сон и обычная ночная мысль — разные записи, но одна механика</h2>
+    <p>Иногда вы сразу понимаете, что это сон. Иногда проснулись с идеей или фразой. Somnori не должен заставлять пользователя полноценно разбираться с категорией в три часа ночи: главное — сохранить материал, а уточнить его можно позже.</p>
+
+    <h2>Чем это отличается от обычного диктофона</h2>
+    <table class="compare-table">
+      <thead><tr><th>Задача</th><th>Обычный диктофон</th><th>Somnori</th></tr></thead>
+      <tbody>
+        <tr><td>Записать голос</td><td>Да</td><td>Да</td></tr>
+        <tr><td>Ночной контекст</td><td>Обычно нет</td><td>Ночной помощник</td></tr>
+        <tr><td>Запись внутри конкретной ночи</td><td>Организуете сами</td><td>Часть ночного сценария</td></tr>
+        <tr><td>Утренний обзор</td><td>Список файлов</td><td>Отдельный Morning-flow</td></tr>
+        <tr><td>Признаки и история снов</td><td>Нет</td><td>Dream-layer Somnori</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Если главная проблема — сам телефон</h2>
+    <p>Когда сон исчезает именно во время разблокировки и поиска нужной кнопки, смотрите отдельный сценарий <a href="/ru/beskontaktnaya-zapis-snov">бесконтактной записи снов</a>. Для общей истории — <a href="/ru/dnevnik-snov">дневник снов Somnori</a>.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">Ночью</p>
+      <h2>Сначала сохранить. Оформить — потом.</h2>
+      <p class="lead">Голос сокращает путь от «я что-то помню» до безопасно сохранённой записи.</p>
+      <div class="actions"><a class="button primary" href="/ru/kak-zapominat-sny">Как лучше запоминать сны</a></div>
+    </div>
+  </section>
+</BaseLayout>
