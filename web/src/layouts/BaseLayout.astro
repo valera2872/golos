@@ -80,6 +80,10 @@ const legacy = copy[locale];
 const publicCopy = isPublicLocale(locale) ? homeV22[locale] : null;
 const base = homePath(locale);
 const anchor = (id: string) => `${base}#${id}`;
+const privacyHref = locale === 'ru' ? '/ru/privacy' : '/privacy';
+const termsHref = locale === 'ru' ? '/ru/terms' : '/terms';
+const faqHref = locale === 'ru' ? '/ru/faq' : '/faq';
+const faqLabel = locale === 'ru' ? 'Вопросы' : 'FAQ';
 
 const organizationSchema = {
   '@context': 'https://schema.org',
@@ -202,8 +206,9 @@ const softwareSchema = type === 'software' ? {
               <div>
                 <div class="footer-title">{publicCopy.footer.legal}</div>
                 <div class="footer-links">
-                  <a href="/privacy">{publicCopy.footer.privacy}</a>
-                  <a href="/terms">{publicCopy.footer.terms}</a>
+                  <a href={privacyHref}>{publicCopy.footer.privacy}</a>
+                  <a href={termsHref}>{publicCopy.footer.terms}</a>
+                  <a href={faqHref}>{faqLabel}</a>
                 </div>
               </div>
             </div>
@@ -238,8 +243,9 @@ const softwareSchema = type === 'software' ? {
               <div>
                 <div class="footer-title">{legacy.footer.legal}</div>
                 <div class="footer-links">
-                  <a href="/privacy">{legacy.footer.privacy}</a>
-                  <a href="/terms">{legacy.footer.terms}</a>
+                  <a href={privacyHref}>{legacy.footer.privacy}</a>
+                  <a href={termsHref}>{legacy.footer.terms}</a>
+                  <a href={faqHref}>{faqLabel}</a>
                 </div>
               </div>
             </div>
