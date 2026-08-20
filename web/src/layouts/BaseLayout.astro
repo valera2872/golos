@@ -53,6 +53,22 @@ const alternatePairs: Record<string, Alternate[]> = {
     { lang: 'en', href: '/sleep-affirmations-app' },
     { lang: 'ru', href: '/ru/affirmacii-pered-snom' },
   ],
+  '/dream-journal': [
+    { lang: 'en', href: '/dream-journal' },
+    { lang: 'ru', href: '/ru/dnevnik-snov' },
+  ],
+  '/voice-dream-journal': [
+    { lang: 'en', href: '/voice-dream-journal' },
+    { lang: 'ru', href: '/ru/zapis-snov-golosom' },
+  ],
+  '/hands-free-dream-journal': [
+    { lang: 'en', href: '/hands-free-dream-journal' },
+    { lang: 'ru', href: '/ru/beskontaktnaya-zapis-snov' },
+  ],
+  '/remember-dreams': [
+    { lang: 'en', href: '/remember-dreams' },
+    { lang: 'ru', href: '/ru/kak-zapominat-sny' },
+  ],
 };
 
 const canonicalPath = new URL(canonical, site).pathname.replace(/\/$/, '') || '/';
@@ -177,6 +193,8 @@ const softwareSchema = type === 'software' ? {
                       <a href="/ru/golosovoy-budilnik">Голосовой будильник</a>
                       <a href="/ru/ritual-pered-snom">Ритуал перед сном</a>
                       <a href="/ru/affirmacii-pered-snom">Аффирмации перед сном</a>
+                      <a href="/ru/dnevnik-snov">Дневник снов</a>
+                      <a href="/ru/kak-zapominat-sny">Как запоминать сны</a>
                     </>
                   )}
                 </div>
