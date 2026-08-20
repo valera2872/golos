@@ -1,0 +1,79 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SeoProductBridge from '../../components/SeoProductBridge.astro';
+
+const title = 'Запись мыслей голосом ночью | Somnori';
+const description = 'Сохраните идею, мысль или озарение ночью голосом и вернитесь ко сну. Somnori связывает ночную запись с утром, будильником и личным сценарием ночи.';
+const alternates = [
+  { lang: 'en', href: '/night-thought-recorder' },
+  { lang: 'ru', href: '/ru/zapis-mysley-golosom' },
+];
+---
+<BaseLayout title={title} description={description} canonical="/ru/zapis-mysley-golosom" type="software" locale="ru" alternates={alternates}>
+  <section class="article-hero">
+    <div class="article-shell wide">
+      <div class="breadcrumbs"><a href="/ru/">Somnori</a> / Ночные мысли</div>
+      <p class="eyebrow">Мысли и идеи ночью</p>
+      <h1>Запишите идею ночью — и снова спите.</h1>
+      <p class="lead">Иногда самая важная мысль приходит в момент засыпания или среди ночи. Задача Somnori — сохранить её голосом без длинной сессии с телефоном и оставить разбор на утро.</p>
+      <div class="actions">
+        <a class="button primary" href="#how-it-works">Как это работает</a>
+        <a class="button secondary" href="/ru/#system">Вся система Somnori</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-tight" id="how-it-works">
+    <div class="article-shell wide">
+      <div class="flow">
+        <div class="flow-step"><div class="flow-number">1</div><h3>Пришла мысль</h3><p class="muted">Идея сайта, фраза, решение, напоминание или внезапное озарение.</p></div>
+        <div class="flow-step"><div class="flow-number">2</div><h3>Позвали Somnori</h3><p class="muted">Ночной помощник уже готов к голосовой команде.</p></div>
+        <div class="flow-step"><div class="flow-number">3</div><h3>Сказали главное</h3><p class="muted">Не надо формулировать идеально. Достаточно сохранить смысл.</p></div>
+        <div class="flow-step"><div class="flow-number">4</div><h3>Вернулись ко сну</h3><p class="muted">Утром запись уже ждёт вас вместе с остальными событиями ночи.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <SeoProductBridge
+    locale="ru"
+    eyebrow="Слой записи"
+    title="Мысли, идеи и сны используют один тихий ночной вход."
+    text="Somnori не заставляет каждую ночную запись становиться сновидением. Тот же бесконтактный сценарий может сохранить идею, напоминание, личную мысль или сон — внутри контекста этой ночи."
+    focus="Запись ночной мысли"
+    variant="capture"
+  />
+
+  <article class="article-shell prose section-tight">
+    <h2>Почему ночью обычные заметки работают хуже</h2>
+    <p>Днём открыть заметки — мелочь. Ночью сама последовательность действий может оказаться лишней: разблокировать телефон, увидеть уведомления, найти нужное приложение, решить, куда сохранить запись. В результате вместо одной мысли начинается полноценная работа с телефоном.</p>
+    <p>Somnori решает более узкую задачу: <strong>сохранить достаточно, чтобы утром не держать идею в голове</strong>.</p>
+
+    <h2>Что можно сохранять</h2>
+    <ul>
+      <li>идею продукта, сайта или проекта;</li>
+      <li>фразу для текста, истории или выступления;</li>
+      <li>решение задачи, которое неожиданно пришло перед сном;</li>
+      <li>напоминание на завтра;</li>
+      <li>личную мысль или наблюдение;</li>
+      <li>фрагмент сна, если пока не хочется оформлять его как запись в дневнике сновидений.</li>
+    </ul>
+
+    <h2>Почему голос здесь важнее красивого текста</h2>
+    <p>Ночная мысль часто приходит кусками. Её не нужно редактировать в постели. Важнее сохранить исходную формулировку и вернуться к ней утром, когда уже можно решить, стоит ли переносить идею в заметки, таск-менеджер или рабочий документ.</p>
+
+    <h2>Somnori не пытается стать дневным менеджером задач</h2>
+    <p>После пробуждения специализированные инструменты могут быть лучше для развития идеи. Somnori отвечает за другой переход: <strong>ночь → сохранённая мысль → утро</strong>.</p>
+
+    <h2>Тот же ночной помощник закрывает и другие причины брать телефон</h2>
+    <p>Если вы просыпаетесь, чтобы узнать время или переставить будильник, это другой сценарий той же системы. Подробнее — на странице <a href="/ru/golosovoy-budilnik">голосового будильника и времени ночью</a>. Если проблема начинается ещё до засыпания, смотрите <a href="/ru/ritual-pered-snom">личный ритуал перед сном</a>.</p>
+  </article>
+
+  <section class="section-tight">
+    <div class="article-shell wide callout">
+      <p class="eyebrow">Правило ночи</p>
+      <h2>Сохранить достаточно. Думать — уже утром.</h2>
+      <p class="lead">Чем меньше причин полноценно включаться в телефон ночью, тем ценнее становится сам ночной сценарий Somnori.</p>
+      <div class="actions"><a class="button primary" href="/ru/#capture">Посмотреть запись в Somnori</a></div>
+    </div>
+  </section>
+</BaseLayout>

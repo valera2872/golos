@@ -7,32 +7,57 @@ interface Props {
   text: string;
   focus: string;
   variant?: 'home' | 'capture' | 'routine' | 'dreams';
+  locale?: 'en' | 'ru';
 }
 
 const {
-  eyebrow = 'One night system',
+  eyebrow,
   title,
   text,
   focus,
   variant = 'dreams',
+  locale = 'en',
 } = Astro.props;
+
+const ru = locale === 'ru';
+const labels = ru ? {
+  eyebrow: 'Одна система ночи',
+  caption: 'Место для реального скриншота приложения',
+  aria: 'Слои продукта Somnori',
+  capture: 'Запись', captureSub: 'Мысли · идеи · сны',
+  night: 'Ночь', nightSub: 'Время · будильник голосом',
+  routine: 'Ритуал', routineSub: 'Звук · практики · самовнушение',
+  dreams: 'Сны', dreamsSub: 'Утро · признаки · осознанность',
+  link: 'Вся ночная система Somnori →',
+  href: '/ru/#system',
+} : {
+  eyebrow: 'One night system',
+  caption: 'Product screenshot slot',
+  aria: 'Somnori product layers',
+  capture: 'Capture', captureSub: 'Thoughts · ideas · dreams',
+  night: 'Night', nightSub: 'Time · voice alarm',
+  routine: 'Routine', routineSub: 'Sound · practices · autosuggestion',
+  dreams: 'Dreams', dreamsSub: 'Morning · signs · lucid layer',
+  link: 'See the full Somnori night system →',
+  href: '/#system',
+};
 ---
 <section class="section-tight seo-product-bridge">
   <div class="article-shell wide seo-bridge-grid">
     <div class="seo-bridge-visual">
-      <ProductPlaceholder label={focus} caption="Product screenshot slot" variant={variant} />
+      <ProductPlaceholder label={focus} caption={labels.caption} variant={variant} />
     </div>
     <div class="seo-bridge-copy">
-      <p class="eyebrow">{eyebrow}</p>
+      <p class="eyebrow">{eyebrow ?? labels.eyebrow}</p>
       <h2>{title}</h2>
       <p class="lead">{text}</p>
-      <div class="seo-system-map" aria-label="Somnori product layers">
-        <span><b>Capture</b><small>Thoughts · ideas · dreams</small></span>
-        <span><b>Night</b><small>Time · voice alarm</small></span>
-        <span><b>Routine</b><small>Sound · practices · autosuggestion</small></span>
-        <span><b>Dreams</b><small>Morning · signs · lucid layer</small></span>
+      <div class="seo-system-map" aria-label={labels.aria}>
+        <span><b>{labels.capture}</b><small>{labels.captureSub}</small></span>
+        <span><b>{labels.night}</b><small>{labels.nightSub}</small></span>
+        <span><b>{labels.routine}</b><small>{labels.routineSub}</small></span>
+        <span><b>{labels.dreams}</b><small>{labels.dreamsSub}</small></span>
       </div>
-      <a class="text-link" href="/#system">See the full Somnori night system →</a>
+      <a class="text-link" href={labels.href}>{labels.link}</a>
     </div>
   </div>
 </section>
