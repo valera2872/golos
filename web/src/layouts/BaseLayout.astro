@@ -35,6 +35,28 @@ const normalizeUrl = (href: string) => {
   const value = new URL(href, site).toString();
   return value !== `${site}/` && value.endsWith('/') ? value.slice(0, -1) : value;
 };
+
+const alternatePairs: Record<string, Alternate[]> = {
+  '/night-thought-recorder': [
+    { lang: 'en', href: '/night-thought-recorder' },
+    { lang: 'ru', href: '/ru/zapis-mysley-golosom' },
+  ],
+  '/voice-alarm-at-night': [
+    { lang: 'en', href: '/voice-alarm-at-night' },
+    { lang: 'ru', href: '/ru/golosovoy-budilnik' },
+  ],
+  '/bedtime-routine-app': [
+    { lang: 'en', href: '/bedtime-routine-app' },
+    { lang: 'ru', href: '/ru/ritual-pered-snom' },
+  ],
+  '/sleep-affirmations-app': [
+    { lang: 'en', href: '/sleep-affirmations-app' },
+    { lang: 'ru', href: '/ru/affirmacii-pered-snom' },
+  ],
+};
+
+const canonicalPath = new URL(canonical, site).pathname.replace(/\/$/, '') || '/';
+const effectiveAlternates = alternates.length > 0 ? alternates : (alternatePairs[canonicalPath] ?? []);
 const canonicalUrl = normalizeUrl(canonical);
 const ogType = type === 'article' ? 'article' : 'website';
 const legacy = copy[locale];
@@ -68,10 +90,10 @@ const softwareSchema = type === 'software' ? {
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
-    {alternates.map((alternate) => (
+    {effectiveAlternates.map((alternate) => (
       <link rel="alternate" hreflang={alternate.lang} href={normalizeUrl(alternate.href)} />
     ))}
-    {alternates.length > 0 && <link rel="alternate" hreflang="x-default" href={`${site}/`} />}
+    {effectiveAlternates.length > 0 && <link rel="alternate" hreflang="x-default" href={`${site}/`} />}
     {noindex && <meta name="robots" content="noindex,follow" />}
     <meta property="og:type" content={ogType} />
     <meta property="og:site_name" content="Somnori" />
@@ -150,9 +172,10 @@ const softwareSchema = type === 'software' ? {
                     </>
                   ) : (
                     <>
-                      <a href={anchor('night-utilities')}>{publicCopy.nav.capture}</a>
-                      <a href={anchor('capabilities')}>Somnori</a>
-                      <a href={anchor('privacy')}>{publicCopy.footer.privacy}</a>
+                      <a href="/ru/zapis-mysley-golosom">Запись мыслей голосом</a>
+                      <a href="/ru/golosovoy-budilnik">Голосовой будильник</a>
+                      <a href="/ru/ritual-pered-snom">Ритуал перед сном</a>
+                      <a href="/ru/affirmacii-pered-snom">Аффирмации перед сном</a>
                     </>
                   )}
                 </div>
