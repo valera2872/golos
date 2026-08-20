@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Somnori FAQ | Night Capture, Alarms, Routines & Dreams';
+const description = 'Answers about Somnori: Android availability, hands-free night capture, time and alarm commands, bedtime routines, autosuggestion, dream journaling and privacy.';
+const alternates = [
+  { lang: 'en', href: '/faq' },
+  { lang: 'ru', href: '/ru/faq' },
+];
+---
+<BaseLayout title={title} description={description} canonical="/faq" type="article" locale="en" alternates={alternates}>
+  <section class="article-hero">
+    <div class="article-shell">
+      <div class="breadcrumbs"><a href="/">Somnori</a> / FAQ</div>
+      <p class="eyebrow">Frequently asked questions</p>
+      <h1>What Somnori is — and what it is not yet.</h1>
+      <p class="lead">Somnori is being built as a hands-free night system for capturing thoughts and dreams, using quiet night utilities, preparing for sleep and returning to the night in the morning.</p>
+    </div>
+  </section>
+
+  <article class="article-shell prose section-tight faq-prose">
+    <h2>Is Somnori only a dream journal?</h2>
+    <p>No. Dreams are an important product and SEO layer, but Somnori also captures night thoughts and ideas, can answer the time and work with voice-set alarms, includes before-sleep audio and practices, and is developing toward personal bedtime and wake protocols.</p>
+
+    <h2>What platform does Somnori support?</h2>
+    <p>Somnori is Android-first. The current tested application interface is Russian. An English Android interface is planned after the Russian product reaches a sufficiently stable semi-final state. The website does not pretend that an English APK already exists.</p>
+
+    <h2>Can I use Somnori without touching the phone at night?</h2>
+    <p>The Night Assistant is designed around a voice-driven flow after the phone has been prepared for the night. Android permissions, battery policies and device-specific constraints still exist, so “hands-free” does not mean the phone never needs setup or that every Android device behaves identically.</p>
+
+    <h2>Can Somnori tell me the time?</h2>
+    <p>Yes. Asking the current time is part of the night assistant logic. The purpose is simple: reduce the need to look at a bright screen just to check the clock.</p>
+
+    <h2>Can I set an alarm by voice?</h2>
+    <p>Yes. Voice alarm commands are part of the current Android night logic. Alarm reliability is treated as infrastructure and tested on real devices rather than as a decorative demo feature.</p>
+
+    <h2>Does Somnori have a smart alarm?</h2>
+    <p>Not in the sleep-stage sense. Somnori currently has a voice/night alarm workflow. A future sleep-stage-aware wake feature would require real Health Connect or wearable data and should not be claimed before that integration exists.</p>
+
+    <h2>Can I record thoughts and ideas that are not dreams?</h2>
+    <p>Yes. A night entry can be a thought, idea, reminder, insight or dream. Somnori is designed to preserve the material first and let you decide what to do with it when you are awake.</p>
+
+    <h2>What does Somnori do before sleep?</h2>
+    <p>The current product direction includes calming music and nature audio, practices and autosuggestion. The broader goal is a personal bedtime routine rather than a giant generic content library.</p>
+
+    <h2>Can Somnori run an autosuggestion after the alarm?</h2>
+    <p>That full wake protocol is a planned next product layer, not a current shipped capability. The intended model is alarm → chosen sound → optional suggestion or practice, but the site keeps that roadmap separate from current functions.</p>
+
+    <h2>Does Somnori interpret dreams with AI?</h2>
+    <p>Deeper Dream Intelligence is planned, but Somnori does not currently market a universal AI symbol dictionary as a finished core feature. The intended direction is cautious, personal and grounded in the user's own history rather than pretending to diagnose the meaning of a dream.</p>
+
+    <h2>Is Somnori available on iPhone?</h2>
+    <p>Not currently. The product work is Android-first. The site should not imply that an iOS build exists until one is actually being developed and tested.</p>
+
+    <h2>Can I download Somnori now?</h2>
+    <p>The Android build is still in active real-device testing and public distribution is being prepared. Download buttons will be added when there is a public build that can be supported reliably.</p>
+
+    <h2>What happens to my recordings and dream data?</h2>
+    <p>The current website is static and does not accept night recordings or dream uploads. Before public Android distribution, Somnori will publish an implementation-specific app privacy policy describing what is stored on-device, what may leave the device, how transcription works, and which export/delete controls actually exist.</p>
+  </article>
+</BaseLayout>

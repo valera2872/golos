@@ -3,27 +3,40 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 const title = 'Terms | Somnori';
 const description = 'Terms for using the Somnori pre-release informational website.';
+const alternates = [
+  { lang: 'en', href: '/terms' },
+  { lang: 'ru', href: '/ru/terms' },
+];
 ---
-<BaseLayout title={title} description={description} canonical="/terms" type="article">
+<BaseLayout title={title} description={description} canonical="/terms" type="article" locale="en" alternates={alternates}>
   <section class="article-hero">
     <div class="article-shell">
       <div class="breadcrumbs"><a href="/">Somnori</a> / Terms</div>
       <p class="eyebrow">Terms</p>
       <h1>Website Terms</h1>
-      <p class="lead">These terms apply to the current pre-release Somnori informational website.</p>
+      <p class="lead">These terms apply to the current pre-release Somnori informational website. Product-specific Android terms will be published before public distribution.</p>
     </div>
   </section>
   <article class="article-shell prose section-tight">
     <h2>Pre-release information</h2>
-    <p>Somnori is under active development. Product descriptions on this site distinguish current capabilities from planned directions, but details may still change before public distribution.</p>
+    <p>Somnori is under active development. Product descriptions on this site distinguish current capabilities from planned directions, but interface details and individual features may still change before public distribution.</p>
 
     <h2>No medical advice</h2>
-    <p>Content about dreams, sleep, autosuggestion or lucid dreaming is provided for general educational and product-information purposes. It is not a substitute for medical, psychiatric or psychological diagnosis or treatment.</p>
+    <p>Content about sleep, dreams, autosuggestion, bedtime practices or lucid dreaming is provided for general educational and product-information purposes. It is not a substitute for medical, psychiatric or psychological diagnosis or treatment.</p>
+
+    <h2>Autosuggestion and affirmations</h2>
+    <p>Somnori does not guarantee personality change, treatment of sleep problems, or another medical outcome from autosuggestion, affirmations, music or practices. These are treated as configurable parts of a personal nighttime routine.</p>
+
+    <h2>Dreams and future analysis</h2>
+    <p>Future dream-analysis features should not be treated as a definitive interpretation of a dream or a psychological diagnosis. Personal patterns and reflection questions may be useful for self-exploration, but they are not medical conclusions.</p>
 
     <h2>Third-party references</h2>
     <p>The site may link to research, app stores, competitors or other third-party resources for context. Those services are governed by their own terms and policies.</p>
 
     <h2>Future app terms</h2>
-    <p>The public Android application will have product-specific terms before distribution, including any subscription, account, cloud-processing or paid-feature conditions that actually apply at launch.</p>
+    <p>The public Android application will have product-specific terms before distribution, including any subscription, account, cloud-processing, payment or refund conditions that actually apply at launch.</p>
+
+    <h2>Changes</h2>
+    <p>These terms may change as the website and product evolve. Material changes should appear together with the relevant public functionality.</p>
   </article>
 </BaseLayout>
