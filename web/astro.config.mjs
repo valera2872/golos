@@ -5,6 +5,10 @@ export default defineConfig({
   site: 'https://somnori.com',
   output: 'static',
   trailingSlash: 'never',
-  integrations: [sitemap()],
+  integrations: [
+    sitemap({
+      filter: (page) => page !== 'https://somnori.com/404',
+    }),
+  ],
   compressHTML: true,
 });
