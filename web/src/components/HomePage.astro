@@ -44,7 +44,7 @@ const anchor = (id: string) => `${base}#${id}`;
     </div>
   </section>
 
-  <section class="section-tight pillars-section">
+  <section class="section-tight pillars-section" id="system">
     <div class="shell night-pillars">
       {t.pillars.map((pillar) => (
         <article class="night-pillar">
@@ -68,7 +68,11 @@ const anchor = (id: string) => `${base}#${id}`;
         <ul class="feature-list">
           {t.capture.bullets.map((bullet) => <li><span>✓</span>{bullet}</li>)}
         </ul>
-        {locale === 'en' && <a class="text-link" href="/night-thought-recorder">Night thoughts & ideas →</a>}
+        {locale === 'en' ? (
+          <a class="text-link" href="/night-thought-recorder">Night thoughts & ideas →</a>
+        ) : (
+          <a class="text-link" href="/ru/zapis-mysley-golosom">Запись мыслей и идей ночью →</a>
+        )}
       </div>
     </div>
   </section>
@@ -88,7 +92,13 @@ const anchor = (id: string) => `${base}#${id}`;
         </article>
       ))}
     </div>
-    {locale === 'en' && <div class="shell" style="margin-top:26px;text-align:center"><a class="text-link" href="/voice-alarm-at-night">Voice alarm & time at night →</a></div>}
+    <div class="shell" style="margin-top:26px;text-align:center">
+      {locale === 'en' ? (
+        <a class="text-link" href="/voice-alarm-at-night">Voice alarm & time at night →</a>
+      ) : (
+        <a class="text-link" href="/ru/golosovoy-budilnik">Голосовой будильник и время ночью →</a>
+      )}
+    </div>
   </section>
 
   <section class="section split-showcase" id="routine">
@@ -106,12 +116,19 @@ const anchor = (id: string) => `${base}#${id}`;
           ))}
         </div>
         <p class="truth-note">{t.bedtime.note}</p>
-        {locale === 'en' && (
-          <div class="inline-guide-links">
-            <a class="text-link" href="/bedtime-routine-app">Bedtime routine app →</a>
-            <a class="text-link" href="/sleep-affirmations-app">Sleep affirmations & autosuggestion →</a>
-          </div>
-        )}
+        <div class="inline-guide-links">
+          {locale === 'en' ? (
+            <>
+              <a class="text-link" href="/bedtime-routine-app">Bedtime routine app →</a>
+              <a class="text-link" href="/sleep-affirmations-app">Sleep affirmations & autosuggestion →</a>
+            </>
+          ) : (
+            <>
+              <a class="text-link" href="/ru/ritual-pered-snom">Ритуал перед сном →</a>
+              <a class="text-link" href="/ru/affirmacii-pered-snom">Аффирмации и самовнушение →</a>
+            </>
+          )}
+        </div>
       </div>
       <div class="showcase-phones phone-offset-right">
         <ProductPlaceholder label={t.placeholder.routine} caption={t.placeholder.caption} variant="routine" />
