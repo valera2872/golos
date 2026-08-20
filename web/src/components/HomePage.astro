@@ -167,7 +167,14 @@ const anchor = (id: string) => `${base}#${id}`;
         <ul class="feature-list">
           {t.dreams.bullets.map((bullet) => <li><span>✓</span>{bullet}</li>)}
         </ul>
-        {locale === 'en' && <a class="text-link" href="/dream-journal">{t.dreams.cta} →</a>}
+        {locale === 'en' ? (
+          <a class="text-link" href="/dream-journal">{t.dreams.cta} →</a>
+        ) : (
+          <div class="inline-guide-links">
+            <a class="text-link" href="/ru/dnevnik-snov">Дневник снов →</a>
+            <a class="text-link" href="/ru/kak-zapominat-sny">Как запоминать сны →</a>
+          </div>
+        )}
       </div>
     </div>
   </section>
