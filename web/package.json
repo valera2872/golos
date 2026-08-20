@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "postbuild": "python3 scripts/validate-v23.py && node scripts/validate-v24.mjs",
+    "postbuild": "python3 scripts/validate-v23.py && node scripts/validate-v24.mjs && node scripts/validate-v25.mjs",
     "preview": "astro preview"
   },
   "dependencies": {
