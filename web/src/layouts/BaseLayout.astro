@@ -57,6 +57,7 @@ const alternatePairs: Record<string, Alternate[]> = {
 
 const canonicalPath = new URL(canonical, site).pathname.replace(/\/$/, '') || '/';
 const effectiveAlternates = alternates.length > 0 ? alternates : (alternatePairs[canonicalPath] ?? []);
+const localeHref = (lang: string) => effectiveAlternates.find((alt) => alt.lang === lang)?.href ?? localeMeta[lang as Locale].path;
 const canonicalUrl = normalizeUrl(canonical);
 const ogType = type === 'article' ? 'article' : 'website';
 const legacy = copy[locale];
@@ -131,7 +132,7 @@ const softwareSchema = type === 'software' ? {
           <summary aria-label={publicCopy?.nav.language ?? legacy.nav.language}><span class="globe">◎</span>{localeMeta[locale].native}<span class="chevron">⌄</span></summary>
           <div class="language-menu">
             {publicLocales.map((lang) => (
-              <a class={lang === locale ? 'active' : ''} href={localeMeta[lang].path} lang={lang} hreflang={lang}>
+              <a class={lang === locale ? 'active' : ''} href={localeHref(lang)} lang={lang} hreflang={lang}>
                 <span>{localeMeta[lang].native}</span><b>{localeMeta[lang].label}</b>
               </a>
             ))}
