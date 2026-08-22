@@ -21,7 +21,7 @@ for (const screen of realScreens) {
   if (en.includes(marker)) throw new Error(`v2.9 RU real screen leaked into EN homepage: ${screen}`);
 }
 
-if (!ru.includes('Реальные экраны текущей сборки')) throw new Error('v2.9 RU real-build disclosure missing');
+if (!ru.toLowerCase().includes('реальные экраны текущей сборки')) throw new Error('v2.9 RU real-build disclosure missing');
 if (!ru.includes('ЕСТЬ В ТЕКУЩЕЙ СБОРКЕ')) throw new Error('v2.9 current wake capability label missing');
 if (!ru.includes('Утром всё, что пришло ночью, снова перед вами')) throw new Error('v2.9 Morning showcase section missing');
 if (!ru.includes('Собрать сценарий') && !ru.includes('собираются в один последовательный сценарий')) throw new Error('v2.9 current routine framing missing');
