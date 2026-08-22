@@ -1,0 +1,121 @@
+name: Build Somnori 0.30.2.1 responsive Premium Pass fix
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-2-premium-pass-a ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.30.2 Premium Pass A source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v302-premium-pass-a.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore accepted 0.30.1 state-fixed source',
+              'Apply Premium Pass A',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v3021-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+          cd buildsrc/quiet-diary
+          sha256sum \
+            app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java \
+            app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java \
+            app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt \
+            app/src/main/java/com/quietdiary/app/NightCommandRouter.java \
+            app/src/main/java/com/quietdiary/app/WakeTemplateStore.java \
+            app/src/main/java/com/quietdiary/app/NightCaptureService.java \
+            app/src/main/java/com/quietdiary/app/SettingsActivity.java \
+            app/src/main/java/com/quietdiary/app/CouePracticeService.java \
+            app/src/main/java/com/quietdiary/app/NightProgramService.java \
+            app/src/main/java/com/quietdiary/app/MorningActivity.java \
+            app/src/main/java/com/quietdiary/app/MorningTools.java \
+            > /tmp/v3021-frozen-core.sha256
+
+      - name: Apply responsive no-clipping fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v3021/apply_v3021.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30021' app/build.gradle.kts
+          grep -q 'versionName = "0.30.2.1"' app/build.gradle.kts
+          grep -q 'android:id="@+id/practiceNightProgramCard"' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'android:minHeight="214dp"' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'android:id="@+id/practiceMusicCard" android:layout_width="match_parent"' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'android:id="@+id/practiceSuggestionCard" android:layout_width="match_parent"' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'Своя фраза для сна и ночного настроя.' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'stopButton.setVisibility(serviceRunning ? View.VISIBLE : View.GONE)' app/src/main/java/com/quietdiary/app/NightAssistantActivity.java
+          grep -q 'archiveEmptyState' app/src/main/res/layout/activity_archive.xml
+          sha256sum -c /tmp/v3021-frozen-core.sha256
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main/res')
+          for p in root.rglob('*.xml'):
+              ET.parse(p)
+          practice=(root/'layout/activity_practice_hub.xml').read_text(encoding='utf-8')
+          assert 'android:layout_height="172dp"' not in practice
+          assert 'practiceMusicCard" android:layout_width="0dp"' not in practice
+          assert 'practiceSuggestionCard" android:layout_width="0dp"' not in practice
+          assert 'android:minHeight="214dp"' in practice
+          assert 'android:maxLines="2" android:text="Самовнушение"' in practice
+          print('0.30.2.1 responsive no-clipping guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.30.2.1-responsive-premium-fix-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.30.2.1-responsive-premium-fix-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.2.1-responsive-premium-fix-debug-apk
+          path: Somnori-0.30.2.1-responsive-premium-fix-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.2.1-responsive-premium-fix-source
+          path: Somnori-0.30.2.1-responsive-premium-fix-source.zip
+          retention-days: 14
