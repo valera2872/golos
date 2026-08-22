@@ -1,0 +1,123 @@
+name: Build Somnori 0.30.2 Premium Pass A
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-1-night-ui-state ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore accepted 0.30.1 state-fixed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v301-night-ui-state.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact accepted Somnori 0.30 source',
+              'Apply 0.30.1 UI state synchronization hotfix',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v302-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+          cd buildsrc/quiet-diary
+          sha256sum \
+            app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java \
+            app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java \
+            app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt \
+            app/src/main/java/com/quietdiary/app/NightCommandRouter.java \
+            app/src/main/java/com/quietdiary/app/WakeTemplateStore.java \
+            app/src/main/java/com/quietdiary/app/NightCaptureService.java \
+            app/src/main/java/com/quietdiary/app/SettingsActivity.java \
+            app/src/main/java/com/quietdiary/app/CouePracticeService.java \
+            app/src/main/java/com/quietdiary/app/NightProgramService.java \
+            app/src/main/java/com/quietdiary/app/MorningActivity.java \
+            app/src/main/java/com/quietdiary/app/MorningTools.java \
+            > /tmp/v302-frozen-core.sha256
+
+      - name: Apply Premium Pass A
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v302/apply_v302.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 3002' app/build.gradle.kts
+          grep -q 'versionName = "0.30.2"' app/build.gradle.kts
+          grep -q 'SOMNORI · НОЧЬ' app/src/main/res/layout/activity_night_assistant.xml
+          grep -q 'Микрофон готов' app/src/main/java/com/quietdiary/app/NightAssistantActivity.java
+          grep -q 'SOMNORI · ПРАКТИКИ' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'Собрать' app/src/main/res/layout/activity_practice_hub.xml
+          grep -q 'archiveEmptyState' app/src/main/res/layout/activity_archive.xml
+          grep -q 'Здесь будут ваши ночные записи' app/src/main/java/com/quietdiary/app/ArchiveActivity.java
+          grep -q 'android:orientation="horizontal"' app/src/main/res/layout/activity_archive.xml
+          grep -q 'stopButton.setVisibility(serviceRunning ? View.VISIBLE : View.GONE)' app/src/main/java/com/quietdiary/app/NightAssistantActivity.java
+          sha256sum -c /tmp/v302-frozen-core.sha256
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main/res')
+          for p in root.rglob('*.xml'): ET.parse(p)
+          practice=(root/'layout/activity_practice_hub.xml').read_text(encoding='utf-8')
+          archive=(root/'layout/activity_archive.xml').read_text(encoding='utf-8')
+          night=(root/'layout/activity_night_assistant.xml').read_text(encoding='utf-8')
+          for marker in ['practiceNightProgramCard','practiceMusicCard','practiceSuggestionCard','practiceWakeCard']:
+              assert marker in practice
+          for marker in ['archiveEmptyState','archiveEmptyTitle','archiveEmptyBody','archiveEmptyAction']:
+              assert marker in archive
+          for marker in ['nightAssistantMicStatus','nightAssistantStateTitle','nightAssistantCommands']:
+              assert marker in night
+          assert 'Микрофон активен' not in night
+          print('0.30.2 Premium Pass A layout/UI guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.30.2-premium-pass-a-audio-slots-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.30.2-premium-pass-a-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.2-premium-pass-a-audio-slots-debug-apk
+          path: Somnori-0.30.2-premium-pass-a-audio-slots-debug.apk
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.2-premium-pass-a-source
+          path: Somnori-0.30.2-premium-pass-a-source.zip
+          retention-days: 14
