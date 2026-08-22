@@ -94,7 +94,6 @@ jobs:
           assert 'current Android build is in Russian' in root_html, 'English availability disclosure missing'
           assert 'проходит тестирование' in ru_html, 'Russian testing disclosure missing'
 
-          # The broader night-system positioning remains intact.
           for marker in [
               'Keep what comes to you at night',
               'The idea at 2:47 AM can be more valuable than the dream',
@@ -120,16 +119,24 @@ jobs:
           ]:
               assert marker in ru_html, f'Russian positioning marker missing: {marker}'
 
-          # EN must remain screenshot-neutral until a real English APK exists.
+          # EN keeps neutral placeholders until a real English APK exists.
           assert 'Real product screenshot slot' in root_html
           assert 'data-screenshot-slot=' in root_html
-          assert 'ru-real-' not in root_html, 'Russian real-screen marker leaked into EN homepage'
-          assert '/screens/ru/' not in root_html, 'Russian screenshot path leaked into EN homepage'
 
-          # RU now uses real 0.30.4 screens instead of placeholders.
+          # RU uses the real 0.30.4 screens. Shared CSS may contain RU selectors on both pages;
+          # only rendered phone markup is forbidden from the English page.
           real_screens = ['home','assistant','routine','sounds','wake','morning','dreams']
           for screen in real_screens:
-              assert f'data-screenshot-slot="ru-real-{screen}"' in ru_html, f'RU real screenshot missing: {screen}'
+              marker = f'data-screenshot-slot="ru-real-{screen}"'
+              assert marker in ru_html, f'RU real screenshot missing: {screen}'
+              assert marker not in root_html, f'RU real screenshot rendered on EN homepage: {screen}'
+          for forbidden in [
+              'Главный экран Somnori 0.30.4 на русском языке',
+              'Ночной помощник Somnori: микрофон готов',
+              'Экран Somnori «Как я хочу проснуться»',
+          ]:
+              assert forbidden not in root_html, f'RU screenshot alt text rendered on EN homepage: {forbidden}'
+
           sprite = root / 'screens' / 'ru' / 'somnori-0.30.4-sprite.webp'
           assert sprite.exists(), 'RU real screenshot sprite missing'
           assert sprite.stat().st_size < 260_000, f'RU sprite too large: {sprite.stat().st_size}'
