@@ -27,7 +27,15 @@ if (!ru.includes('Утром всё, что пришло ночью, снова 
 if (!ru.includes('Собрать сценарий') && !ru.includes('собираются в один последовательный сценарий')) throw new Error('v2.9 current routine framing missing');
 
 // English stays screenshot-neutral until a real English APK exists.
-if (en.includes('/screens/ru/') || en.includes('ru-real-')) throw new Error('v2.9 Russian screenshots leaked into English output');
+// Shared compiled CSS may legitimately contain the RU component styles; rendered RU phone markup may not.
+for (const forbidden of [
+  'data-screenshot-slot=\"ru-real-',
+  'Главный экран Somnori 0.30.4 на русском языке',
+  'Ночной помощник Somnori: микрофон готов',
+  'Экран Somnori «Как я хочу проснуться»',
+]) {
+  if (en.includes(forbidden)) throw new Error(`v2.9 rendered RU product UI leaked into EN homepage: ${forbidden}`);
+}
 const neutralSlots = (en.match(/data-screenshot-slot/g) || []).length;
 if (neutralSlots < 4) throw new Error(`v2.9 EN neutral screenshot slots unexpectedly reduced: ${neutralSlots}`);
 
