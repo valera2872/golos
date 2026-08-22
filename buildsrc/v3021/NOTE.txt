@@ -1,0 +1,1 @@
+Stacks Music and Autosuggestion cards on narrow phones and removes fixed-height clipping.
