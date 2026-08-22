@@ -1,0 +1,93 @@
+---
+type Screen = 'home' | 'assistant' | 'routine' | 'wake' | 'morning' | 'dreams' | 'sounds';
+
+interface Props {
+  screen: Screen;
+  alt: string;
+  class?: string;
+  caption?: string;
+  priority?: boolean;
+}
+
+const { screen, alt, class: className = '', caption, priority = false } = Astro.props;
+const positions: Record<Screen, string> = {
+  home: '0%',
+  assistant: '16.6667%',
+  routine: '33.3333%',
+  wake: '50%',
+  morning: '66.6667%',
+  dreams: '83.3333%',
+  sounds: '100%',
+};
+---
+<figure class={`real-phone-figure ${className}`} data-screen={screen}>
+  <div class="real-phone" data-screenshot-slot={`ru-real-${screen}`}>
+    <div class="real-phone-glass">
+      <div
+        class="real-screen-sprite"
+        style={`--screen-y:${positions[screen]}`}
+        role="img"
+        aria-label={alt}
+        fetchpriority={priority ? 'high' : undefined}
+      ></div>
+    </div>
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .real-phone-figure {
+    width: min(100%, 326px);
+    margin: 0 auto;
+    position: relative;
+  }
+  .real-phone {
+    aspect-ratio: 420 / 933;
+    padding: 7px;
+    border-radius: 40px;
+    position: relative;
+    background: linear-gradient(145deg, rgba(225,220,255,.34), rgba(87,73,160,.13) 48%, rgba(20,23,48,.72));
+    border: 1px solid rgba(210,202,255,.28);
+    box-shadow: 0 38px 100px rgba(0,0,0,.46), 0 0 60px rgba(127,104,255,.13), inset 0 1px rgba(255,255,255,.13);
+  }
+  .real-phone::before {
+    content: '';
+    position: absolute;
+    inset: 1px 22% auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
+    z-index: 2;
+  }
+  .real-phone-glass {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 33px;
+    background: #08091a;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+  }
+  .real-screen-sprite {
+    width: 100%;
+    height: 100%;
+    background-image: url('/screens/ru/somnori-0.30.4-sprite.webp');
+    background-repeat: no-repeat;
+    background-size: 100% 700%;
+    background-position: center var(--screen-y);
+  }
+  figcaption {
+    margin-top: 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .hero-real { width: min(100%, 350px); transform: rotate(1.2deg); }
+  .supporting-real { width: min(78%, 250px); }
+  @media (max-width: 900px) {
+    .hero-real { transform: none; }
+  }
+  @media (max-width: 620px) {
+    .real-phone-figure { width: min(86vw, 310px); }
+    .real-phone { border-radius: 34px; padding: 6px; }
+    .real-phone-glass { border-radius: 28px; }
+  }
+</style>
