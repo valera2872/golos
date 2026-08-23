@@ -128,7 +128,7 @@ jobs:
         shell: bash
         run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
 
-      - name: Prepare artifacts
+      - name: Prepare integrated artifacts
         shell: bash
         run: |
           set -euo pipefail
@@ -138,10 +138,67 @@ jobs:
           cd buildsrc
           zip -qr ../Somnori-0.30.6-voice-lab-source.zip quiet-diary
 
+      - name: Build install-alongside Voice Lab
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('buildsrc/quiet-diary')
+
+          build = root/'app/build.gradle.kts'
+          text = build.read_text(encoding='utf-8')
+          assert 'applicationId = "com.quietdiary.app"' in text
+          text = text.replace('applicationId = "com.quietdiary.app"', 'applicationId = "com.quietdiary.app.voicelab"', 1)
+          text = text.replace('versionName = "0.30.6-voice-lab"', 'versionName = "0.30.6-voice-lab-standalone"', 1)
+          build.write_text(text, encoding='utf-8')
+
+          manifest = root/'app/src/main/AndroidManifest.xml'
+          text = manifest.read_text(encoding='utf-8')
+          text = text.replace('android:label="Somnori"', 'android:label="Somnori Voice Lab"', 1)
+          old_voice = '        <activity android:name=".VoiceLabActivity" android:exported="false" />'
+          new_voice = '''        <activity android:name=".VoiceLabActivity" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n        </activity>'''
+          assert old_voice in text
+          text = text.replace(old_voice, new_voice, 1)
+          main_pattern = re.compile(r'''        <activity\n            android:name="\.MainActivity"\n            android:exported="true">\n            <intent-filter>\n                <action android:name="android\.intent\.action\.MAIN" />\n                <category android:name="android\.intent\.category\.LAUNCHER" />\n            </intent-filter>\n        </activity>''')
+          text, count = main_pattern.subn('        <activity android:name=".MainActivity" android:exported="false" />', text, count=1)
+          assert count == 1
+          manifest.write_text(text, encoding='utf-8')
+
+          voice = root/'app/src/main/java/com/quietdiary/app/VoiceLabActivity.java'
+          text = voice.read_text(encoding='utf-8')
+          text = text.replace('Использовать этот голос в Somnori', 'Запомнить этот вариант в тестере')
+          text = text.replace('Голос сохранён. Он будет использоваться временем и будильником.', 'Вариант сохранён в тестере. Пришлите мне имя голоса и параметры.')
+          text = text.replace('Сейчас выбрано для Somnori: ', 'Сейчас выбрано в тестере: ')
+          voice.write_text(text, encoding='utf-8')
+
+          layout = root/'app/src/main/res/layout/activity_voice_lab.xml'
+          text = layout.read_text(encoding='utf-8')
+          text = text.replace('Сохранённый профиль применяется к голосу времени и к тексту будильника при следующем запуске этих функций.',
+                              'Это отдельный безопасный тестер. Он не меняет установленный Somnori; запомните имя понравившегося голоса, скорость и высоту.')
+          layout.write_text(text, encoding='utf-8')
+
+          assert 'com.quietdiary.app.voicelab' in build.read_text(encoding='utf-8')
+          assert 'Somnori Voice Lab' in manifest.read_text(encoding='utf-8')
+          assert manifest.read_text(encoding='utf-8').count('android.intent.category.LAUNCHER') == 1
+          print('Standalone Voice Lab variant prepared')
+          PY
+          gradle -p buildsrc/quiet-diary :app:assembleDebug --stacktrace --console=plain
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-Voice-Lab-standalone-debug.apk
+
       - uses: actions/upload-artifact@v4
         with:
           name: somnori-0.30.6-voice-lab-debug-apk
           path: Somnori-0.30.6-voice-lab-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-voice-lab-standalone-debug-apk
+          path: Somnori-Voice-Lab-standalone-debug.apk
           retention-days: 14
 
       - uses: actions/upload-artifact@v4
