@@ -1,0 +1,104 @@
+.real-phone-pair {
+  width: min(100%, 500px);
+  min-height: 720px;
+  margin-inline: auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.real-phone-pair > :first-child {
+  position: relative;
+  z-index: 2;
+  transform: translateX(-34px);
+}
+
+.real-phone-pair .real-phone-support {
+  position: absolute;
+  z-index: 1;
+  right: -8px;
+  top: 96px;
+  width: min(64%, 236px);
+  opacity: .74;
+  filter: saturate(.9) brightness(.86);
+  transform: rotate(4deg);
+}
+
+.current-label,
+.future-label {
+  display: inline-flex;
+  margin-bottom: 15px;
+}
+
+.current-label span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 232, 178, .28);
+  background: rgba(77, 192, 139, .09);
+  color: #98efc0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.ru-real-wake {
+  position: relative;
+  background:
+    radial-gradient(circle at 22% 50%, rgba(134, 105, 255, .11), transparent 29rem),
+    linear-gradient(180deg, rgba(255,255,255,.012), rgba(255,255,255,.025));
+}
+
+.ru-real-wake .showcase-grid,
+#morning .showcase-grid {
+  align-items: center;
+}
+
+.ru-real-wake .showcase-copy h2,
+#morning .showcase-copy h2 {
+  max-width: 720px;
+}
+
+@media (min-width: 901px) {
+  .hero-product-stage .real-phone-figure {
+    margin-right: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  .real-phone-pair {
+    min-height: 640px;
+    width: min(100%, 430px);
+  }
+  .real-phone-pair > :first-child {
+    transform: translateX(-22px);
+  }
+  .real-phone-pair .real-phone-support {
+    right: 4px;
+    top: 84px;
+  }
+}
+
+@media (max-width: 620px) {
+  .real-phone-pair {
+    min-height: 620px;
+    width: 100%;
+  }
+  .real-phone-pair > :first-child {
+    transform: none;
+  }
+  .real-phone-pair .real-phone-support {
+    display: none;
+  }
+  .ru-real-wake .showcase-phones,
+  #morning .showcase-phones {
+    order: 2;
+  }
+  .ru-real-wake .showcase-copy,
+  #morning .showcase-copy {
+    order: 1;
+  }
+}

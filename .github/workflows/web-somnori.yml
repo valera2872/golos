@@ -2,7 +2,7 @@ name: Build Somnori web
 
 on:
   push:
-    branches: [ agent/somnori-web-v1, agent/somnori-web-v2, agent/somnori-web-v2-1, agent/somnori-web-v2-2 ]
+    branches: [ agent/somnori-web-v1, agent/somnori-web-v2, agent/somnori-web-v2-1, agent/somnori-web-v2-2, agent/somnori-web-v2-9-ru-real-screens ]
     paths:
       - 'web/**'
       - '.github/workflows/web-somnori.yml'
@@ -34,7 +34,7 @@ jobs:
         working-directory: web
         run: npm run build
 
-      - name: Validate EN/RU launch, positioning and SEO
+      - name: Validate EN/RU launch, positioning and screenshots
         shell: bash
         run: |
           set -euo pipefail
@@ -94,7 +94,6 @@ jobs:
           assert 'current Android build is in Russian' in root_html, 'English availability disclosure missing'
           assert 'проходит тестирование' in ru_html, 'Russian testing disclosure missing'
 
-          # v2.2 must sell the broader night system, not collapse back into dream-only positioning.
           for marker in [
               'Keep what comes to you at night',
               'The idea at 2:47 AM can be more valuable than the dream',
@@ -105,7 +104,7 @@ jobs:
               'Dream layer',
               'One night system',
           ]:
-              assert marker in root_html, f'v2.2 English positioning marker missing: {marker}'
+              assert marker in root_html, f'English positioning marker missing: {marker}'
 
           for marker in [
               'Не теряйте то, что приходит к вам ночью',
@@ -113,16 +112,34 @@ jobs:
               'Сколько времени?',
               'Голосовой будильник',
               'Соберите ночь, в которую хотите войти',
-              'СЛЕДУЮЩИЙ СЛОЙ ПРОДУКТА',
+              'ЕСТЬ В ТЕКУЩЕЙ СБОРКЕ',
+              'Утром всё, что пришло ночью, снова перед вами',
               'Слой сновидений',
               'Одна система ночи',
           ]:
-              assert marker in ru_html, f'v2.2 Russian positioning marker missing: {marker}'
+              assert marker in ru_html, f'Russian positioning marker missing: {marker}'
 
-          # Screenshot placeholders must stay neutral until matching localized APK screenshots exist.
+          # EN keeps neutral placeholders until a real English APK exists.
           assert 'Real product screenshot slot' in root_html
-          assert 'Место для реального скриншота приложения' in ru_html
           assert 'data-screenshot-slot=' in root_html
+
+          # RU uses the real 0.30.4 screens. Shared CSS may contain RU selectors on both pages;
+          # only rendered phone markup is forbidden from the English page.
+          real_screens = ['home','assistant','routine','sounds','wake','morning','dreams']
+          for screen in real_screens:
+              marker = f'data-screenshot-slot="ru-real-{screen}"'
+              assert marker in ru_html, f'RU real screenshot missing: {screen}'
+              assert marker not in root_html, f'RU real screenshot rendered on EN homepage: {screen}'
+          for forbidden in [
+              'Главный экран Somnori 0.30.4 на русском языке',
+              'Ночной помощник Somnori: микрофон готов',
+              'Экран Somnori «Как я хочу проснуться»',
+          ]:
+              assert forbidden not in root_html, f'RU screenshot alt text rendered on EN homepage: {forbidden}'
+
+          sprite = root / 'screens' / 'ru' / 'somnori-0.30.4-sprite.webp'
+          assert sprite.exists(), 'RU real screenshot sprite missing'
+          assert sprite.stat().st_size < 260_000, f'RU sprite too large: {sprite.stat().st_size}'
 
           robots = root / 'robots.txt'
           assert robots.exists(), 'robots.txt missing'
@@ -158,10 +175,11 @@ jobs:
 
           assert not output_for('/tools/dream-interpreter').exists(), 'dream interpreter placeholder must not be published yet'
 
-          print('Somnori Web v2.2 validation OK')
+          print('Somnori Web v2.9 validation OK')
           print('Validated pages:', len(expected))
           print('Public languages: EN, RU')
-          print('Positioning: capture + night utilities + routines + dreams')
+          print('EN screenshots: neutral placeholders')
+          print('RU screenshots: real 0.30.4 product screens')
           PY
 
       - name: Upload static site artifact
