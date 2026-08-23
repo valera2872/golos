@@ -37,18 +37,19 @@ const positions: Record<Screen, string> = {
 
 <style>
   .real-phone-figure {
-    width: min(100%, 326px);
+    width: min(100%, 230px);
+    max-width: 230px;
     margin: 0 auto;
     position: relative;
   }
   .real-phone {
     aspect-ratio: 420 / 933;
-    padding: 7px;
-    border-radius: 40px;
+    padding: 5px;
+    border-radius: 32px;
     position: relative;
     background: linear-gradient(145deg, rgba(225,220,255,.34), rgba(87,73,160,.13) 48%, rgba(20,23,48,.72));
     border: 1px solid rgba(210,202,255,.28);
-    box-shadow: 0 38px 100px rgba(0,0,0,.46), 0 0 60px rgba(127,104,255,.13), inset 0 1px rgba(255,255,255,.13);
+    box-shadow: 0 32px 78px rgba(0,0,0,.42), 0 0 50px rgba(127,104,255,.12), inset 0 1px rgba(255,255,255,.13);
   }
   .real-phone::before {
     content: '';
@@ -62,14 +63,14 @@ const positions: Record<Screen, string> = {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    border-radius: 33px;
+    border-radius: 27px;
     background: #08091a;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
   }
   .real-screen-sprite {
     width: 100%;
     height: 100%;
-    background-image: url('/screens/ru/somnori-0.30.4-sprite.avif');
+    background-image: url('/screens/ru/somnori-0.30.4-sprite.avif?v=293');
     background-repeat: no-repeat;
     background-size: 100% 700%;
     background-position: center var(--screen-y);
@@ -80,14 +81,23 @@ const positions: Record<Screen, string> = {
     color: var(--muted);
     font-size: 12px;
   }
-  .hero-real { width: min(100%, 350px); transform: rotate(1.2deg); }
-  .supporting-real { width: min(78%, 250px); }
+  .hero-real {
+    width: min(100%, 250px);
+    max-width: 250px;
+    transform: rotate(.8deg);
+  }
+  .supporting-real {
+    width: min(78%, 170px);
+    max-width: 170px;
+  }
   @media (max-width: 900px) {
-    .hero-real { transform: none; }
+    .hero-real { transform: none; width: min(72vw, 250px); }
+    .real-phone-figure { width: min(68vw, 230px); }
   }
   @media (max-width: 620px) {
-    .real-phone-figure { width: min(86vw, 310px); }
-    .real-phone { border-radius: 34px; padding: 6px; }
-    .real-phone-glass { border-radius: 28px; }
+    .real-phone-figure,
+    .hero-real { width: min(78vw, 250px); max-width: 250px; }
+    .real-phone { border-radius: 30px; padding: 5px; }
+    .real-phone-glass { border-radius: 25px; }
   }
 </style>
