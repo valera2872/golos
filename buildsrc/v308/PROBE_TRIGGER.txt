@@ -1,1 +1,1 @@
-Trigger PR probe after android-v308-probe.yml was installed on the v307 base branch.
+Trigger full Somnori 0.30.8 Arina runtime build after the PR base workflow was upgraded.
