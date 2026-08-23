@@ -1,0 +1,104 @@
+name: Build Somnori 0.30.8 Arina Runtime
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-7-piper-voice-lab ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.30.6 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v306-voice-lab.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.30.5 source',
+              'Apply Voice Lab and shared TTS profile',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v308-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30060' app/build.gradle.kts
+          grep -q 'versionName = "0.30.6-voice-lab"' app/build.gradle.kts
+
+      - name: Apply Arina runtime voice-pack integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v308/apply_v308.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30080' app/build.gradle.kts
+          grep -q 'versionName = "0.30.8-arina-runtime"' app/build.gradle.kts
+          test -s app/src/main/java/com/quietdiary/app/ArinaVoicePack.java
+          grep -q 'ArinaVoicePack.playTime(this, spokenHour, spokenMinute, arinaVolume)' app/src/main/java/com/quietdiary/app/NightCaptureService.java
+          grep -q 'voiceLabImportArinaButton' app/src/main/java/com/quietdiary/app/VoiceLabActivity.java
+          grep -q 'Установить пакет Arina' app/src/main/res/layout/activity_voice_lab.xml
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+          arina=(root/'java/com/quietdiary/app/ArinaVoicePack.java').read_text(encoding='utf-8')
+          assert 'hour_%02d.mp3' in arina and 'minute_%02d.mp3' in arina
+          assert 'copied >= HOURS + MINUTES' in arina
+          assert 'Thread.sleep(110L)' in arina
+          voice=(root/'java/com/quietdiary/app/VoiceLabActivity.java').read_text(encoding='utf-8')
+          assert 'ActivityResultContracts.OpenDocument' in voice
+          assert '83 компонента' in voice
+          print('0.30.8 Arina runtime guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.30.8-Arina-runtime-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.30.8-Arina-runtime-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.8-arina-runtime-debug-apk
+          path: Somnori-0.30.8-Arina-runtime-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.8-arina-runtime-source
+          path: Somnori-0.30.8-Arina-runtime-source.zip
+          retention-days: 14
