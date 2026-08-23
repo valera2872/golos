@@ -1,0 +1,68 @@
+{
+  "pack_id": "somnori-ru-arina-pilot-v1",
+  "locale": "ru-RU",
+  "provider": "ElevenLabs",
+  "voice": {
+    "name": "Arina",
+    "selection_note": "Primary Somnori voice selected by physical listening on 2026-08-23. Deep, calm Russian voice from ElevenLabs Voice Library.",
+    "voice_id": null
+  },
+  "recommended_model_for_pilot": "eleven_multilingual_v2",
+  "purpose": "Small physical-listening pilot before production integration or bulk generation.",
+  "phrases": [
+    {
+      "id": "night_listening",
+      "text": "Я слушаю.",
+      "context": "Night assistant becomes ready for a voice command"
+    },
+    {
+      "id": "ack_short",
+      "text": "Хорошо.",
+      "context": "Minimal night acknowledgement"
+    },
+    {
+      "id": "remembered",
+      "text": "Хорошо. Я запомнила.",
+      "context": "Night thought or dream has been captured"
+    },
+    {
+      "id": "sleep_well",
+      "text": "Спи спокойно.",
+      "context": "Return-to-sleep closing phrase"
+    },
+    {
+      "id": "remembered_sleep",
+      "text": "Хорошо. Я запомнила. Спи спокойно.",
+      "context": "Full capture confirmation at night"
+    },
+    {
+      "id": "time_test",
+      "text": "Сейчас два часа двадцать семь минут.",
+      "context": "Representative current-time response; production time is dynamic"
+    },
+    {
+      "id": "alarm_set",
+      "text": "Хорошо. Будильник установлен.",
+      "context": "Alarm successfully set"
+    },
+    {
+      "id": "alarm_disabled",
+      "text": "Будильник отключён.",
+      "context": "Alarm disabled"
+    },
+    {
+      "id": "wake_default",
+      "text": "Доброе утро. Пора просыпаться.",
+      "context": "Default wake-up phrase"
+    },
+    {
+      "id": "wake_time_test",
+      "text": "Доброе утро. Семь тридцать. Пора просыпаться.",
+      "context": "Representative alarm wake-up with time"
+    }
+  ],
+  "dynamic_audio": {
+    "current_time": "Generate/cache online when available; use offline fallback when unavailable. Do not pre-generate 1440 time files in the pilot.",
+    "custom_alarm_phrase": "Generate and cache when the alarm is configured so wake-up never depends on network availability."
+  }
+}
