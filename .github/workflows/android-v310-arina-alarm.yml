@@ -1,0 +1,128 @@
+name: Build Somnori 0.31.0 Arina Alarm
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.30.6 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v306-voice-lab.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.30.5 source',
+              'Apply Voice Lab and shared TTS profile',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v310-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+      - name: Apply 0.30.9 bundled Arina scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v309/arina_core_v1.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = []
+          names += [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 104
+          PY
+          python3 buildsrc/v309/apply_v309.py
+          grep -q 'versionName = "0.30.9-arina-bundled-core"' buildsrc/quiet-diary/app/build.gradle.kts
+
+      - name: Apply 0.31.0 Arina alarm integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v310/arina_core_v2.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = []
+          names += [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          names += [f'alarm/alarm_{i:02d}.mp3' for i in range(1, 12)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 115
+          PY
+          python3 buildsrc/v310/apply_v310.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30100' app/build.gradle.kts
+          grep -q 'versionName = "0.31.0-arina-alarm"' app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('app/src/main')
+          wake = (root/'java/com/quietdiary/app/WakeAlarmActivity.java').read_text(encoding='utf-8')
+          night = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          voice = (root/'java/com/quietdiary/app/ArinaVoicePack.java').read_text(encoding='utf-8')
+          assert 'PHRASE_WAKE_UP' in voice and 'PHRASE_ALARM_STOPPED' in voice
+          assert 'playArinaWake' in wake and 'alarmCycleNumber > 1' in wake
+          assert 'finishAlarmDialogByArina' in night
+          assert 'PHRASE_ALARM_OFF' in night and 'PHRASE_ALARM_NONE' in night
+          with zipfile.ZipFile(root/'assets/arina_core_v2.zip') as z:
+              mp3 = [n for n in z.namelist() if n.endswith('.mp3')]
+              assert len(mp3) == 115
+              assert len([n for n in mp3 if n.startswith('alarm/')]) == 11
+          print('0.31.0 Arina alarm guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare scaffold APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.31.0-Arina-alarm-scaffold-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.0-arina-alarm-scaffold
+          path: Somnori-0.31.0-Arina-alarm-scaffold-debug.apk
+          retention-days: 14
