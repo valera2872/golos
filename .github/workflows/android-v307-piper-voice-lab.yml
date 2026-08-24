@@ -1,0 +1,91 @@
+name: Prepare Somnori 0.30.7 Neural Voice Lab
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-6-voice-lab ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-neural-voice-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download official sherpa-onnx Russian neural TTS APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://huggingface.co/csukuangfj2/sherpa-onnx-apk/resolve/main/tts-new/1.13.4'
+          mkdir -p voice-apks
+
+          # Piper: four Russian medium voices.
+          curl -L --fail --retry 4 --retry-delay 3 \
+            "$BASE/sherpa-onnx-1.13.4-arm64-v8a-rus-tts-vits-piper-ru_RU-irina-medium.apk" \
+            -o voice-apks/Somnori-Piper-Irina-test.apk
+          curl -L --fail --retry 4 --retry-delay 3 \
+            "$BASE/sherpa-onnx-1.13.4-arm64-v8a-rus-tts-vits-piper-ru_RU-denis-medium.apk" \
+            -o voice-apks/Somnori-Piper-Denis-test.apk
+          curl -L --fail --retry 4 --retry-delay 3 \
+            "$BASE/sherpa-onnx-1.13.4-arm64-v8a-rus-tts-vits-piper-ru_RU-dmitri-medium.apk" \
+            -o voice-apks/Somnori-Piper-Dmitri-test.apk
+          curl -L --fail --retry 4 --retry-delay 3 \
+            "$BASE/sherpa-onnx-1.13.4-arm64-v8a-rus-tts-vits-piper-ru_RU-ruslan-medium.apk" \
+            -o voice-apks/Somnori-Piper-Ruslan-test.apk
+
+          # Supertonic 3: 2026 on-device multilingual model, 10 speaker styles, Russian supported.
+          curl -L --fail --retry 4 --retry-delay 3 \
+            "$BASE/sherpa-onnx-1.13.4-arm64-v8a-rus-tts-sherpa-onnx-supertonic-3-tts-int8-2026-05-11.apk" \
+            -o voice-apks/Somnori-Supertonic3-Russian-test.apk
+
+      - name: Verify APK containers and record hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for apk in voice-apks/*.apk; do
+            test -s "$apk"
+            unzip -tq "$apk" >/dev/null
+          done
+          sha256sum voice-apks/*.apk | tee voice-apks/SHA256SUMS.txt
+          du -h voice-apks/*.apk | tee voice-apks/SIZES.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-piper-irina-test-apk
+          path: voice-apks/Somnori-Piper-Irina-test.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-piper-denis-test-apk
+          path: voice-apks/Somnori-Piper-Denis-test.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-piper-dmitri-test-apk
+          path: voice-apks/Somnori-Piper-Dmitri-test.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-piper-ruslan-test-apk
+          path: voice-apks/Somnori-Piper-Ruslan-test.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-supertonic3-russian-test-apk
+          path: voice-apks/Somnori-Supertonic3-Russian-test.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-neural-voice-test-checksums
+          path: |
+            voice-apks/SHA256SUMS.txt
+            voice-apks/SIZES.txt
+          retention-days: 14
