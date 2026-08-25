@@ -1,0 +1,170 @@
+name: Build Somnori 0.31.3 Arina Polish
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.30.6 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v306-voice-lab.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.30.5 source',
+              'Apply Voice Lab and shared TTS profile',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v313-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+      - name: Apply 0.30.9 bundled Arina scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v309/arina_core_v1.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 104
+          PY
+          python3 buildsrc/v309/apply_v309.py
+
+      - name: Apply 0.31.0 Arina alarm scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v310/arina_core_v2.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          names += [f'alarm/alarm_{i:02d}.mp3' for i in range(1, 12)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 115
+          PY
+          python3 buildsrc/v310/apply_v310.py
+
+      - name: Apply 0.31.1 compositional alarm time
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v311/arina_core_v3.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          names += [f'alarm/alarm_{i:02d}.mp3' for i in range(1, 12)]
+          names += [f'alarm_hours/alarm_hour_{i:02d}.mp3' for i in range(24)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 139
+          PY
+          python3 buildsrc/v311/apply_v311.py
+
+      - name: Apply 0.31.2 Arina volume cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v312/apply_v312.py
+
+      - name: Apply 0.31.3 Arina flow polish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v313/arina_core_v4.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          names += [f'alarm/alarm_{i:02d}.mp3' for i in range(1, 12)]
+          names += [f'alarm_hours/alarm_hour_{i:02d}.mp3' for i in range(24)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 139
+          PY
+          python3 buildsrc/v313/apply_v313.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30130' app/build.gradle.kts
+          grep -q 'versionName = "0.31.3-arina-flow-polish"' app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('app/src/main')
+          voice = (root/'java/com/quietdiary/app/ArinaVoicePack.java').read_text(encoding='utf-8')
+          wake = (root/'java/com/quietdiary/app/WakeAlarmActivity.java').read_text(encoding='utf-8')
+          assert 'arina_core_v4.zip' in voice and 'arina_voice_core_v4' in voice
+          assert 'Thread.sleep(110L)' not in voice
+          assert 'PHRASE_GOOD_MORNING' in wake
+          assert 'morning-setting' not in wake
+          with zipfile.ZipFile(root/'assets/arina_core_v4.zip') as z:
+              assert len([n for n in z.namelist() if n.endswith('.mp3')]) == 139
+          print('0.31.3 Arina polish guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare scaffold APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.31.3-Arina-polish-scaffold-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.3-arina-polish-scaffold
+          path: Somnori-0.31.3-Arina-polish-scaffold-debug.apk
+          retention-days: 14
