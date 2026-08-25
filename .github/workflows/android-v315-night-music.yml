@@ -1,0 +1,131 @@
+name: Build Somnori 0.31.5 Night Music
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct through 0.31.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v313-arina-polish.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Restore exact Somnori 0.30.6 source',
+              'Apply 0.30.9 bundled Arina scaffold',
+              'Apply 0.31.0 Arina alarm scaffold',
+              'Apply 0.31.1 compositional alarm time',
+              'Apply 0.31.2 Arina volume cleanup',
+              'Apply 0.31.3 Arina flow polish',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v315-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+      - name: Apply 0.31.4 Arina error voice pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v314/arina_core_v5.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          names += [f'alarm/alarm_{i:02d}.mp3' for i in range(1, 12)]
+          names += [f'alarm_hours/alarm_hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'errors/error_{i:02d}.mp3' for i in range(1, 9)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 147
+          PY
+          python3 buildsrc/v314/apply_v314.py
+
+      - name: Generate full-length CI music scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ffmpeg >/dev/null
+          mkdir -p buildsrc/v315/music
+          ffmpeg -y -hide_banner -loglevel error -f lavfi -i "sine=frequency=293.66:duration=180:sample_rate=22050" -af "volume=0.015,afade=t=in:st=0:d=2,afade=t=out:st=178:d=2" -b:a 32k buildsrc/v315/music/music_sea_harp.mp3
+          ffmpeg -y -hide_banner -loglevel error -f lavfi -i "sine=frequency=220:duration=240:sample_rate=22050" -af "volume=0.015,afade=t=in:st=0:d=2,afade=t=out:st=238:d=2" -b:a 32k buildsrc/v315/music/music_calm_energy.mp3
+          ffmpeg -y -hide_banner -loglevel error -f lavfi -i "sine=frequency=146.83:duration=360:sample_rate=22050" -af "volume=0.012,afade=t=in:st=0:d=3,afade=t=out:st=357:d=3" -b:a 32k buildsrc/v315/music/music_quiet_meditation.mp3
+          ffmpeg -y -hide_banner -loglevel error -f lavfi -i "anoisesrc=color=pink:duration=240:sample_rate=22050" -af "lowpass=f=1800,volume=0.010,afade=t=in:st=0:d=2,afade=t=out:st=238:d=2" -b:a 32k buildsrc/v315/music/nature_forest.mp3
+
+      - name: Apply 0.31.5 full night music
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v315/apply_v315.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30150' app/build.gradle.kts
+          grep -q 'versionName = "0.31.5-night-music"' app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          raw = Path('app/src/main/res/raw')
+          expected = {
+              'music_sea_harp.mp3': (179, 182),
+              'music_calm_energy.mp3': (239, 242),
+              'music_quiet_meditation.mp3': (359, 362),
+              'nature_forest.mp3': (239, 242),
+          }
+          for name, (lo, hi) in expected.items():
+              p = raw/name
+              assert p.is_file() and p.stat().st_size > 100_000, (name, p.stat().st_size if p.exists() else None)
+              out = subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=nw=1:nk=1',str(p)], text=True).strip()
+              d = float(out)
+              assert lo <= d <= hi, (name, d)
+          print('0.31.5 full-length music guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare scaffold APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.31.5-night-music-scaffold-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.5-night-music-scaffold
+          path: Somnori-0.31.5-night-music-scaffold-debug.apk
+          retention-days: 14
