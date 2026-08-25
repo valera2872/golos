@@ -1,0 +1,43 @@
+name: Inspect Somnori 0.31.4 Error Paths
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct through 0.31.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v313-arina-polish.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Restore exact Somnori 0.30.6 source',
+              'Apply 0.30.9 bundled Arina scaffold',
+              'Apply 0.31.0 Arina alarm scaffold',
+              'Apply 0.31.1 compositional alarm time',
+              'Apply 0.31.2 Arina volume cleanup',
+              'Apply 0.31.3 Arina flow polish',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v314-reconstruct-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+      - name: Inspect error voice paths
+        run: python3 buildsrc/v314/inspect_v314.py
