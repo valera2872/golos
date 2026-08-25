@@ -135,7 +135,7 @@ jobs:
           assert 'arina_core_v4.zip' in voice and 'arina_voice_core_v4' in voice
           assert 'Thread.sleep(110L)' not in voice
           assert 'PHRASE_GOOD_MORNING' in wake
-          assert 'morning-setting' not in wake
+          assert 'tts.speak("Сделайте спокойный вдох. Сегодня не нужно решать всё сразу.' not in wake
           with zipfile.ZipFile(root/'assets/arina_core_v4.zip') as z:
               assert len([n for n in z.namelist() if n.endswith('.mp3')]) == 139
           print('0.31.3 Arina polish guards: OK')
