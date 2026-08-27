@@ -1,0 +1,141 @@
+name: Build Somnori 0.30.5 RU UI State Reliability
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-4-showcase-polish ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.30.4 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v304-showcase-polish.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.30.3 source',
+              'Apply Showcase Polish',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v305-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30040' app/build.gradle.kts
+          grep -q 'versionName = "0.30.4"' app/build.gradle.kts
+          sha256sum \
+            app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java \
+            app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java \
+            app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt \
+            app/src/main/java/com/quietdiary/app/NightCommandRouter.java \
+            app/src/main/java/com/quietdiary/app/WakeTemplateStore.java \
+            app/src/main/java/com/quietdiary/app/NightCaptureService.java \
+            app/src/main/java/com/quietdiary/app/WakeWordTrainer.java \
+            app/src/main/java/com/quietdiary/app/WakePhraseTester.java \
+            app/src/main/java/com/quietdiary/app/MainActivity.java \
+            app/src/main/java/com/quietdiary/app/NightAssistantActivity.java \
+            app/src/main/java/com/quietdiary/app/SelfSuggestionActivity.java \
+            app/src/main/java/com/quietdiary/app/CouePracticeService.java \
+            app/src/main/java/com/quietdiary/app/NightProgramService.java \
+            app/src/main/java/com/quietdiary/app/MorningActivity.java \
+            app/src/main/java/com/quietdiary/app/DreamHubActivity.java \
+            app/src/main/java/com/quietdiary/app/SoundLibraryActivity.java \
+            app/src/main/java/com/quietdiary/app/NightProgramActivity.java \
+            app/src/main/java/com/quietdiary/app/WakeSettingsActivity.java \
+            app/src/main/java/com/quietdiary/app/WakeAlarmActivity.java \
+            > /tmp/v305-frozen-behavior.sha256
+
+      - name: Apply RU UI and training-state reliability fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v305/apply_v305.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30050' app/build.gradle.kts
+          grep -q 'versionName = "0.30.5"' app/build.gradle.kts
+          sha256sum -c /tmp/v305-frozen-behavior.sha256
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+
+          night = (root/'res/layout/activity_night_assistant.xml').read_text(encoding='utf-8')
+          suggestion = (root/'res/layout/activity_self_suggestion.xml').read_text(encoding='utf-8')
+          settings = (root/'java/com/quietdiary/app/SettingsActivity.java').read_text(encoding='utf-8')
+
+          assert 'android:layout_height="142dp"' not in night
+          assert 'android:minHeight="172dp"' in night
+          assert 'android:layout_height="wrap_content"' in night
+
+          assert 'Выберите смысл' not in suggestion
+          assert 'Выберите фразу для самовнушения' in suggestion
+          assert 'android:text="Выберите фразу"' in suggestion
+          assert 'Используйте готовую фразу для самовнушения или напишите свою.' in suggestion
+
+          assert 'settingsStateListener' in settings
+          assert settings.count('refreshServiceRunningState();') >= 5
+          assert 'dreamPhraseInput.setEnabled(enabled);' in settings
+          assert 'dreamPhraseInput.setEnabled(!serviceRunning && !busy);' in settings
+          assert 'Предыдущая запись ещё завершается' in settings
+          assert 'Записываю повтор ' in settings and 'Говорите…' in settings
+          assert re.search(r'onResume\(\).*?refreshServiceRunningState\(\);.*?renderTrainingState\(\);', settings, re.S)
+          assert re.search(r'private void applyWakePreset\(String phrase\).*?if \(!canTrain\(\)\) return;', settings, re.S)
+          assert re.search(r'private void renderTrainingState\(\) \{\s*refreshServiceRunningState\(\);', settings)
+          print('0.30.5 UI/state reliability guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.30.5-ru-ui-state-reliability-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.30.5-ru-ui-state-reliability-source.zip quiet-diary
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.5-ru-ui-state-reliability-debug-apk
+          path: Somnori-0.30.5-ru-ui-state-reliability-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.5-ru-ui-state-reliability-source
+          path: Somnori-0.30.5-ru-ui-state-reliability-source.zip
+          retention-days: 14

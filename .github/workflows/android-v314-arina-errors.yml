@@ -1,0 +1,116 @@
+name: Build Somnori 0.31.4 Arina Errors
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct through 0.31.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v313-arina-polish.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Restore exact Somnori 0.30.6 source',
+              'Apply 0.30.9 bundled Arina scaffold',
+              'Apply 0.31.0 Arina alarm scaffold',
+              'Apply 0.31.1 compositional alarm time',
+              'Apply 0.31.2 Arina volume cleanup',
+              'Apply 0.31.3 Arina flow polish',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v314-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+      - name: Apply 0.31.4 Arina error voice pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          out = Path('buildsrc/v314/arina_core_v5.zip')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          names = [f'hours/hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'minutes/minute_{i:02d}.mp3' for i in range(1, 60)]
+          names += [f'night/night_{i:02d}.mp3' for i in range(1, 13)]
+          names += [f'recording/record_{i:02d}.mp3' for i in range(1, 10)]
+          names += [f'alarm/alarm_{i:02d}.mp3' for i in range(1, 12)]
+          names += [f'alarm_hours/alarm_hour_{i:02d}.mp3' for i in range(24)]
+          names += [f'errors/error_{i:02d}.mp3' for i in range(1, 9)]
+          with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+              for n in names: z.writestr(n, b'CI')
+          assert len(names) == 147
+          PY
+          python3 buildsrc/v314/apply_v314.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30140' app/build.gradle.kts
+          grep -q 'versionName = "0.31.4-arina-errors"' app/build.gradle.kts
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('app/src/main')
+          voice = (root/'java/com/quietdiary/app/ArinaVoicePack.java').read_text(encoding='utf-8')
+          night = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          assert 'arina_core_v5.zip' in voice and 'arina_voice_core_v5' in voice
+          for i in range(1, 9):
+              assert f'errors/error_{i:02d}.mp3' in voice
+          assert 'retryAlarmDialogByArina' in night
+          assert 'PHRASE_ERROR_ALARM_TIME' in night
+          assert 'PHRASE_ERROR_TIME' in night
+          assert 'PHRASE_ERROR_GENERIC' in night
+          assert 'retryAlarmDialogByVoice("Не расслышал время.' not in night
+          with zipfile.ZipFile(root/'assets/arina_core_v5.zip') as z:
+              mp3 = [n for n in z.namelist() if n.endswith('.mp3')]
+              assert len(mp3) == 147
+              assert len([n for n in mp3 if n.startswith('errors/')]) == 8
+          print('0.31.4 Arina error-pack guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare scaffold APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.31.4-Arina-errors-scaffold-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.4-arina-errors-scaffold
+          path: Somnori-0.31.4-Arina-errors-scaffold-debug.apk
+          retention-days: 14

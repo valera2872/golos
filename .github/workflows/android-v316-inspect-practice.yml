@@ -1,0 +1,76 @@
+name: Inspect Somnori 0.31.6 Night Practice
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact 0.31.5 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v315-night-music.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Reconstruct through 0.31.3',
+              'Apply 0.31.4 Arina error voice pack',
+              'Generate full-length CI music scaffold',
+              'Apply 0.31.5 full night music',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v316-inspect-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+      - name: Print practice and night routing fragments
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app
+          echo '=== CouePracticeService ==='
+          grep -n -E 'sleep|delay|pause|INTERVAL|REPEAT|ACTION_|start|stop|practice|suggest|phrase' "$ROOT/CouePracticeService.java" | head -n 220 || true
+          echo '=== SelfSuggestionActivity ==='
+          grep -n -E 'pause|interval|delay|Seek|ACTION_|CouePracticeService|startService|startForegroundService' "$ROOT/SelfSuggestionActivity.java" | head -n 220 || true
+          echo '=== NightCaptureService command routing ==='
+          grep -n -E 'command|practice|практик|внуш|timeDetector|alarm|wake|matched|route|ACTION_' "$ROOT/NightCaptureService.java" | head -n 320 || true
+          echo '=== NightProgramService handoff ==='
+          grep -n -E 'Coue|practice|NightCaptureService|ACTION_|startService|startForegroundService|autoNight|sleep|delay' "$ROOT/NightProgramService.java" | head -n 260 || true
+
+      - name: Print relevant full method windows
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app')
+          for fn in ['CouePracticeService.java','NightCaptureService.java','NightProgramService.java','SelfSuggestionActivity.java']:
+              text=(root/fn).read_text(encoding='utf-8')
+              print('\n===== '+fn+' =====')
+              needles=['Thread.sleep','postDelayed','ACTION_START','ACTION_ARM_VOICE_START','CouePracticeService','trained','start practice','practice','практик','самовнуш']
+              lines=text.splitlines()
+              shown=set()
+              for i,line in enumerate(lines):
+                  if any(n.lower() in line.lower() for n in needles):
+                      a=max(0,i-12); b=min(len(lines),i+28)
+                      key=(a,b)
+                      if key in shown: continue
+                      shown.add(key)
+                      print(f'--- lines {a+1}-{b} ---')
+                      for j in range(a,b): print(f'{j+1:04d}: {lines[j]}')
+          PY
