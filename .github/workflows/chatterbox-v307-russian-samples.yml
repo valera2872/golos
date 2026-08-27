@@ -1,0 +1,115 @@
+name: Generate Somnori Chatterbox V3 Russian samples
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-6-voice-lab ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-chatterbox-samples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CPU PyTorch and current Chatterbox master
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
+          python -m pip install 'git+https://github.com/resemble-ai/chatterbox.git@master'
+          python - <<'PY'
+          import inspect
+          from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+          sig = inspect.signature(ChatterboxMultilingualTTS.from_pretrained)
+          print('from_pretrained signature:', sig)
+          assert 't3_model' in sig.parameters, 'Installed Chatterbox does not contain Multilingual V3 support'
+          PY
+
+      - name: Download official Russian reference prompt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p chatterbox-samples
+          curl -L --fail --retry 4 --retry-delay 2 \
+            'https://storage.googleapis.com/chatterbox-demo-samples/mtl_prompts/ru_m.flac' \
+            -o chatterbox-samples/ru_m_official_reference.flac
+          test -s chatterbox-samples/ru_m_official_reference.flac
+
+      - name: Generate Russian Somnori samples with Chatterbox Multilingual V3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import time
+          from pathlib import Path
+          import torchaudio as ta
+          from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+
+          out = Path('chatterbox-samples')
+          ref = out / 'ru_m_official_reference.flac'
+          print('Loading Chatterbox Multilingual V3 on CPU...')
+          t0 = time.time()
+          model = ChatterboxMultilingualTTS.from_pretrained(device='cpu', t3_model='v3')
+          print(f'Model loaded in {time.time()-t0:.1f}s at {model.sr} Hz')
+
+          text = 'Сейчас два двадцать семь. Хорошо. Будильник на семь тридцать. Доброе утро. Пора просыпаться.'
+          profiles = [
+              ('01_ru_reference_default', 0.50, 0.50),
+              ('02_ru_reference_calm',    0.30, 0.35),
+              ('03_ru_reference_cfg0',    0.30, 0.00),
+          ]
+          for name, exaggeration, cfg in profiles:
+              print(f'Generating {name}: exaggeration={exaggeration}, cfg={cfg}')
+              t1 = time.time()
+              wav = model.generate(
+                  text,
+                  language_id='ru',
+                  audio_prompt_path=str(ref),
+                  exaggeration=exaggeration,
+                  cfg_weight=cfg,
+                  temperature=0.75,
+                  repetition_penalty=1.2,
+              )
+              ta.save(str(out / f'{name}.wav'), wav, model.sr)
+              print(f'{name} generated in {time.time()-t1:.1f}s')
+
+          (out/'README.txt').write_text(
+              'Somnori Chatterbox Multilingual V3 Russian-reference samples\n'
+              'Official reference: Chatterbox multilingual demo ru_m.flac\n'
+              'Text: Сейчас два двадцать семь. Хорошо. Будильник на семь тридцать. Доброе утро. Пора просыпаться.\n\n'
+              '01_ru_reference_default.wav — exaggeration 0.50, cfg_weight 0.50\n'
+              '02_ru_reference_calm.wav    — exaggeration 0.30, cfg_weight 0.35\n'
+              '03_ru_reference_cfg0.wav    — exaggeration 0.30, cfg_weight 0.00\n\n'
+              'This rerun fixes the previous baseline mistake: Russian synthesis is explicitly conditioned on the official Russian reference clip.\n',
+              encoding='utf-8'
+          )
+          PY
+
+      - name: Verify outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s chatterbox-samples/ru_m_official_reference.flac
+          for wav in chatterbox-samples/*.wav; do
+            test -s "$wav"
+          done
+          sha256sum chatterbox-samples/*.wav chatterbox-samples/*.flac > chatterbox-samples/SHA256SUMS.txt
+          ls -lh chatterbox-samples
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-chatterbox-v3-russian-reference-samples
+          path: chatterbox-samples
+          retention-days: 14
