@@ -1,0 +1,1 @@
+Trigger full Somnori 0.30.8 Arina runtime build after the PR base workflow was upgraded.
