@@ -1,0 +1,59 @@
+name: Export Somnori 0.31.5 Practice Source
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact 0.31.5 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v315-night-music.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Reconstruct through 0.31.3',
+              'Apply 0.31.4 Arina error voice pack',
+              'Generate full-length CI music scaffold',
+              'Apply 0.31.5 full night music',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v316-export-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+      - name: Collect exact source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app
+          mkdir -p v316-source
+          cp "$ROOT/CouePracticeService.java" v316-source/
+          cp "$ROOT/SelfSuggestionActivity.java" v316-source/
+          cp "$ROOT/NightCaptureService.java" v316-source/
+          cp "$ROOT/NightProgramService.java" v316-source/
+          cp buildsrc/quiet-diary/app/build.gradle.kts v316-source/
+          sha256sum v316-source/* > v316-source/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.5-practice-source
+          path: v316-source
+          retention-days: 1
