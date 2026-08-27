@@ -75,7 +75,8 @@ jobs:
           import zipfile
           root = Path('buildsrc/quiet-diary/app/src/main')
           voice = (root/'java/com/quietdiary/app/ArinaVoicePack.java').read_text(encoding='utf-8')
-          assert voice.count('setNextMediaPlayer') == 1
+          assert voice.count('first.setNextMediaPlayer(second);') == 1
+          assert voice.count('first.setNextMediaPlayer(null);') == 1
           assert 'Thread.sleep(110L)' not in voice
           assert 'arina_core_v5.zip' in voice
           with zipfile.ZipFile(root/'assets/arina_core_v5.zip') as z:
