@@ -2,10 +2,12 @@
 
 Physical-test follow-up from 0.31.5.
 
-Planned scope:
-- shorten the trained self-suggestion interval to about 3 seconds;
-- allow the trained practice to be started hands-free from active night mode;
-- return automatically to night listening after the practice completes;
-- preserve the verified Arina, alarm, recording, time and music behavior.
+Implemented scope:
+- explicit self-suggestion scheduler gap reduced from 3000 ms to 1500 ms in both standalone practice and the evening program; the user's own recorded clip is left untouched, so the audible pause should land near three seconds instead of >5 seconds;
+- the already-trained practice-start samples are loaded into the active NightCaptureService detector set;
+- while night mode is listening, the saved phrase (default: «Начать практику») can start the user's existing recorded practice hands-free;
+- night capture releases the microphone before CouePracticeService starts;
+- the command forces auto-night for that run, so completion returns automatically to night listening;
+- time, alarm, dream, entry, stop, Arina and music behavior otherwise remains unchanged.
 
-Implementation is intentionally pending exact-source inspection; no production behavior is changed by this file.
+Alarm wording is deliberately not changed in this pass: the existing sliced assets cannot form «Будильник установлен на …» cleanly without a redundant or mechanical splice. That voice polish is deferred until a dedicated voice regeneration pass.
