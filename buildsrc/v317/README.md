@@ -25,3 +25,5 @@
 5. Run `Начать практику` once from night mode and verify that completion still returns to night listening.
 
 This release improves the playback transport around the existing human Arina recordings. It does not claim to regenerate or replace those commercial recordings in the public CI scaffold.
+
+CI checks the exact gapless link and cleanup calls separately, while freezing the 0.31.6 night/practice runtime and Arina v5 asset byte-for-byte.
