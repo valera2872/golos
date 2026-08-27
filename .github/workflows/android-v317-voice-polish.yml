@@ -1,0 +1,114 @@
+name: Build Somnori 0.31.7 Voice Polish
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact 0.31.6 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v316-night-practice.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Reconstruct exact 0.31.5 source',
+              'Apply 0.31.6 night practice UX',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v317-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+          ROOT=buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app
+          grep -q 'versionCode = 30160' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.31.6-night-practice"' buildsrc/quiet-diary/app/build.gradle.kts
+          sha256sum \
+            "$ROOT/NightCaptureService.java" \
+            "$ROOT/CouePracticeService.java" \
+            "$ROOT/NightProgramService.java" \
+            buildsrc/quiet-diary/app/src/main/assets/arina_core_v5.zip \
+            > /tmp/v317-frozen-runtime.sha256
+
+      - name: Apply 0.31.7 gapless Arina voice polish
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v317/apply_v317.py
+          ROOT=buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app
+          VOICE="$ROOT/ArinaVoicePack.java"
+
+          grep -q 'versionCode = 30170' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.31.7-arina-gapless"' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'playGaplessPair' "$VOICE"
+          grep -q 'setNextMediaPlayer' "$VOICE"
+          grep -q 'alarm_hours/alarm_hour_%02d.mp3' "$VOICE"
+          grep -q 'minutes/minute_%02d.mp3' "$VOICE"
+
+          # 0.31.7 must not disturb the hands-free morning/practice path or replace
+          # the installed local Arina pack with a new scaffold.
+          sha256sum -c /tmp/v317-frozen-runtime.sha256
+          grep -q 'VerificationPurpose.PRACTICE' "$ROOT/NightCaptureService.java"
+          grep -q 'startPracticeFromNight' "$ROOT/NightCaptureService.java"
+          grep -q 'putBoolean(CouePracticeActivity.KEY_AUTO_NIGHT, true)' "$ROOT/NightCaptureService.java"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('buildsrc/quiet-diary/app/src/main')
+          voice = (root/'java/com/quietdiary/app/ArinaVoicePack.java').read_text(encoding='utf-8')
+          assert voice.count('setNextMediaPlayer') == 1
+          assert 'Thread.sleep(110L)' not in voice
+          assert 'arina_core_v5.zip' in voice
+          with zipfile.ZipFile(root/'assets/arina_core_v5.zip') as z:
+              mp3 = [n for n in z.namelist() if n.endswith('.mp3')]
+              assert len(mp3) == 147
+              assert len([n for n in mp3 if n.startswith('alarm_hours/')]) == 24
+          print('0.31.7 voice-polish guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare scaffold APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.31.7-Arina-Gapless-scaffold-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.7-arina-gapless-scaffold
+          path: Somnori-0.31.7-Arina-Gapless-scaffold-debug.apk
+          retention-days: 14
