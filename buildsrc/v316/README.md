@@ -12,4 +12,4 @@ Implemented scope:
 
 Alarm wording is deliberately not changed in this pass: the existing sliced assets cannot form «Будильник установлен на …» cleanly without a redundant or mechanical splice. That voice polish is deferred until a dedicated voice regeneration pass.
 
-CI note: the 0.31.5 step owns validation of the bundled music; 0.31.6 only checks that those resources survive unchanged before compiling the practice change.
+CI note: the 0.31.5 step owns validation of the bundled music; 0.31.6 only checks that those exact MP3 resources survive unchanged before compiling the practice change.
