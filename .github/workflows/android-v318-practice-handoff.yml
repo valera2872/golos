@@ -1,0 +1,120 @@
+name: Build Somnori 0.31.8 Practice Handoff
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct exact 0.31.7 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v316-night-practice.yml').read_text(encoding='utf-8').splitlines()
+          names = [
+              'Reconstruct exact 0.31.5 source',
+              'Apply 0.31.6 night practice UX',
+          ]
+          for n, name in enumerate(names, 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v318-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+          python3 buildsrc/v317/apply_v317.py
+
+          ROOT=buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app
+          grep -q 'versionCode = 30170' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.31.7-arina-gapless"' buildsrc/quiet-diary/app/build.gradle.kts
+
+          # Freeze recognition/template stores and Arina transport that 0.31.8 must not alter.
+          sha256sum \
+            "$ROOT/AcousticWakeDetector.java" \
+            "$ROOT/GoogleSpeechTranscriber.kt" \
+            "$ROOT/NightCommandRouter.java" \
+            "$ROOT/WakeTemplateStore.java" \
+            "$ROOT/CoueStartTemplateStore.java" \
+            "$ROOT/ArinaVoicePack.java" \
+            buildsrc/quiet-diary/app/src/main/assets/arina_core_v5.zip \
+            > /tmp/v318-frozen-core.sha256
+
+          # Practice start has its own template store; it must not replace ordinary night commands.
+          grep -q 'coue_start_templates_v1' "$ROOT/CoueStartTemplateStore.java"
+          ! grep -q 'coue_start_templates_v1' "$ROOT/WakeTemplateStore.java"
+
+      - name: Apply 0.31.8 practice listener handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v318/apply_v318.py
+          ROOT=buildsrc/quiet-diary/app/src/main/java/com/quietdiary/app
+
+          grep -q 'versionCode = 30180' buildsrc/quiet-diary/app/build.gradle.kts
+          grep -q 'versionName = "0.31.8-practice-handoff"' buildsrc/quiet-diary/app/build.gradle.kts
+
+          # Unrelated recognition stores and voice transport remain byte-for-byte identical.
+          sha256sum -c /tmp/v318-frozen-core.sha256
+
+          # Exact state/handoff guards for the reported physical bug.
+          grep -q 'wasVoiceWait' "$ROOT/CouePracticeService.java"
+          grep -q 'publish(MODE_OFF, "Ожидание команды практики отключено"' "$ROOT/CouePracticeService.java"
+          grep -q 'handoffFromPracticeWait' "$ROOT/NightCaptureService.java"
+          grep -q 'stopService(new Intent(this, CouePracticeService.class))' "$ROOT/NightCaptureService.java"
+          grep -q 'Ожидание практики передано ночному режиму' "$ROOT/NightCaptureService.java"
+          grep -q 'Thread.sleep(180L)' "$ROOT/NightCaptureService.java"
+
+          # Night mode still owns every detector, including practice.
+          grep -q 'WakeTemplateStore.loadEntryForDetection' "$ROOT/NightCaptureService.java"
+          grep -q 'WakeTemplateStore.loadDreamForDetection' "$ROOT/NightCaptureService.java"
+          grep -q 'WakeTemplateStore.loadTimeForDetection' "$ROOT/NightCaptureService.java"
+          grep -q 'WakeTemplateStore.loadAlarmForDetection' "$ROOT/NightCaptureService.java"
+          grep -q 'WakeTemplateStore.loadStopForDetection' "$ROOT/NightCaptureService.java"
+          grep -q 'CoueStartTemplateStore.loadAll' "$ROOT/NightCaptureService.java"
+          grep -q 'startPracticeFromNight' "$ROOT/NightCaptureService.java"
+          grep -q 'putBoolean(CouePracticeActivity.KEY_AUTO_NIGHT, true)' "$ROOT/NightCaptureService.java"
+
+          echo '0.31.8 practice handoff guards: OK'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare scaffold APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.31.8-Practice-Handoff-scaffold-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.31.8-practice-handoff-scaffold
+          path: Somnori-0.31.8-Practice-Handoff-scaffold-debug.apk
+          retention-days: 14
