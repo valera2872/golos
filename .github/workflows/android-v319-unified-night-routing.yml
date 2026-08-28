@@ -3,6 +3,8 @@ name: Build Somnori 0.31.9 Unified Night Routing
 on:
   push:
     branches: [ agent/v0-31-9-unified-night-command-routing ]
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
   workflow_dispatch:
 
 permissions:
@@ -61,7 +63,6 @@ jobs:
           grep -q 'completedPurpose == VerificationPurpose.PRACTICE' "$ROOT/NightCaptureService.java"
           ! grep -q 'completedPurpose != VerificationPurpose.PRACTICE' "$ROOT/NightCaptureService.java"
 
-          # 31.8 microphone ownership fix and all six acoustic banks stay present.
           grep -q 'handoffFromPracticeWait' "$ROOT/NightCaptureService.java"
           grep -q 'WakeTemplateStore.loadEntryForDetection' "$ROOT/NightCaptureService.java"
           grep -q 'WakeTemplateStore.loadDreamForDetection' "$ROOT/NightCaptureService.java"
