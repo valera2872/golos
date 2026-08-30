@@ -1,0 +1,110 @@
+name: Generate Somnori Qwen3-TTS Russian samples via official Space
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-6-voice-lab ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-qwen3-space-russian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Gradio client
+        run: python -m pip install -U gradio_client
+
+      - name: Download clean Russian reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qwen3-space-samples
+          curl -L --fail --retry 4 \
+            'https://storage.googleapis.com/chatterbox-demo-samples/mtl_prompts/ru_m.flac' \
+            -o qwen3-space-samples/reference-ru.flac
+          test -s qwen3-space-samples/reference-ru.flac
+
+      - name: Generate through official Qwen GPU Space
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          from gradio_client import Client, handle_file
+
+          out = Path('qwen3-space-samples')
+          ref = out / 'reference-ru.flac'
+          ref_text = 'В прошлом месяце мы достигли нового рубежа: два миллиарда просмотров на нашем YouTube-канале.'
+          target = 'Сейчас два двадцать семь. Хорошо. Будильник на семь тридцать. Доброе утро. Пора просыпаться.'
+
+          client = Client('Qwen/Qwen3-TTS')
+          print(client.view_api())
+
+          def save_audio(result, name):
+              audio = result[0] if isinstance(result, (tuple, list)) else result
+              status = result[1] if isinstance(result, (tuple, list)) and len(result) > 1 else ''
+              print(name, 'status:', status)
+              src = Path(str(audio))
+              if not src.exists():
+                  raise RuntimeError(f'Audio output path does not exist: {audio!r}')
+              dst = out / name
+              shutil.copyfile(src, dst)
+              print('saved', dst, dst.stat().st_size)
+
+          # 0.6B exact Russian voice clone.
+          r = client.predict(
+              handle_file(str(ref)), ref_text, target, 'Russian', False, '0.6B',
+              api_name='/generate_voice_clone'
+          )
+          save_audio(r, '01-qwen3-clone-0.6B.wav')
+
+          # 1.7B exact Russian voice clone.
+          r = client.predict(
+              handle_file(str(ref)), ref_text, target, 'Russian', False, '1.7B',
+              api_name='/generate_voice_clone'
+          )
+          save_audio(r, '02-qwen3-clone-1.7B.wav')
+
+          # 1.7B voice design: no foreign reference, explicitly Russian and soft female.
+          instruction = ('Мягкий, спокойный, тёплый женский голос носителя русского языка. '
+                         'Без иностранного акцента. Ночная тихая подача, естественная разговорная интонация, '
+                         'не дикторская и не механическая. Говорить чуть медленнее обычного.')
+          r = client.predict(
+              target, 'Russian', instruction,
+              api_name='/generate_voice_design'
+          )
+          save_audio(r, '03-qwen3-design-soft-female-1.7B.wav')
+
+          (out/'README.txt').write_text(
+              'Somnori Qwen3-TTS official GPU Space Russian test\n'
+              '01: 0.6B Base full voice clone from clean Russian reference + exact transcript\n'
+              '02: 1.7B Base full voice clone from the same Russian reference\n'
+              '03: 1.7B Voice Design, explicit soft native-Russian female night voice instruction\n',
+              encoding='utf-8'
+          )
+          PY
+
+      - name: Verify samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s qwen3-space-samples/01-qwen3-clone-0.6B.wav
+          test -s qwen3-space-samples/02-qwen3-clone-1.7B.wav
+          test -s qwen3-space-samples/03-qwen3-design-soft-female-1.7B.wav
+          sha256sum qwen3-space-samples/*.wav > qwen3-space-samples/SHA256SUMS.txt
+          ls -lh qwen3-space-samples
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-qwen3-space-russian-samples
+          path: qwen3-space-samples
+          retention-days: 14
