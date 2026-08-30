@@ -1,0 +1,114 @@
+name: Generate Somnori Qwen3-TTS Russian samples
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-6-voice-lab ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate-qwen3-russian:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      OMP_NUM_THREADS: '4'
+      MKL_NUM_THREADS: '4'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CPU PyTorch and Qwen3-TTS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+          python -m pip install -U qwen-tts soundfile
+
+      - name: Download clean Russian reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qwen3-samples
+          curl -L --fail --retry 4 \
+            'https://storage.googleapis.com/chatterbox-demo-samples/mtl_prompts/ru_m.flac' \
+            -o qwen3-samples/reference-ru.flac
+          test -s qwen3-samples/reference-ru.flac
+
+      - name: Generate Russian Somnori samples with Qwen3-TTS 0.6B Base
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import time
+          import torch
+          import soundfile as sf
+          from pathlib import Path
+          from qwen_tts import Qwen3TTSModel
+
+          out = Path('qwen3-samples')
+          ref = str(out/'reference-ru.flac')
+          ref_text = 'В прошлом месяце мы достигли нового рубежа: два миллиарда просмотров на нашем YouTube-канале.'
+          target = 'Сейчас два двадцать семь. Хорошо. Будильник на семь тридцать. Доброе утро. Пора просыпаться.'
+
+          print('Loading Qwen3-TTS 12Hz 0.6B Base on CPU...')
+          t0 = time.time()
+          model = Qwen3TTSModel.from_pretrained(
+              'Qwen/Qwen3-TTS-12Hz-0.6B-Base',
+              device_map='cpu',
+              dtype=torch.bfloat16,
+              attn_implementation='eager',
+          )
+          print(f'Loaded in {time.time()-t0:.1f}s')
+
+          cases = [
+              ('01_icl', False, target),
+              ('02_xvector', True, target),
+              ('03_short', False, 'Хорошо. Будильник на семь тридцать.'),
+          ]
+          for name, xvec, text in cases:
+              t1 = time.time()
+              print(f'Generating {name}, x_vector_only={xvec}')
+              wavs, sr = model.generate_voice_clone(
+                  text=text,
+                  language='Russian',
+                  ref_audio=ref,
+                  ref_text=None if xvec else ref_text,
+                  x_vector_only_mode=xvec,
+                  do_sample=True,
+                  top_k=50,
+                  top_p=1.0,
+                  temperature=0.85,
+                  repetition_penalty=1.05,
+              )
+              sf.write(out/f'{name}.wav', wavs[0], sr)
+              print(f'{name} generated in {time.time()-t1:.1f}s @ {sr}Hz')
+
+          (out/'README.txt').write_text(
+              'Somnori Qwen3-TTS 12Hz 0.6B Base Russian voice-clone test\n'
+              'Russian reference is the official Chatterbox demo ru_m prompt, used only as a clean Russian articulation reference for this technical comparison.\n'
+              '01_icl.wav — full ICL reference audio + exact transcript\n'
+              '02_xvector.wav — speaker embedding only, no reference transcript\n'
+              '03_short.wav — short alarm phrase using full ICL\n',
+              encoding='utf-8'
+          )
+          PY
+
+      - name: Verify outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          for wav in qwen3-samples/*.wav; do test -s "$wav"; done
+          sha256sum qwen3-samples/*.wav > qwen3-samples/SHA256SUMS.txt
+          ls -lh qwen3-samples
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-qwen3-tts-russian-samples
+          path: qwen3-samples
+          retention-days: 14
