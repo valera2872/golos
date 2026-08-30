@@ -1,0 +1,223 @@
+name: Generate Somnori Arina pilot voice pack
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: ElevenLabs TTS model
+        required: true
+        default: eleven_multilingual_v2
+        type: choice
+        options:
+          - eleven_multilingual_v2
+          - eleven_v3
+      voice_id:
+        description: Optional exact ElevenLabs Arina voice ID. Leave blank to search by name.
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      MODEL_ID: ${{ inputs.model_id }}
+      INPUT_VOICE_ID: ${{ inputs.voice_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Arina pilot pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import datetime as dt
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          root = pathlib.Path('.')
+          manifest_path = root / 'voicepacks/ru/arina/pilot-pack.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          out = root / 'voicepacks-out/ru-arina-pilot'
+          out.mkdir(parents=True, exist_ok=True)
+
+          api_key = os.environ.get('ELEVENLABS_API_KEY', '').strip()
+          if not api_key:
+              raise SystemExit(
+                  'Missing GitHub Actions secret ELEVENLABS_API_KEY. '
+                  'Do not put the key in the repository or workflow file.'
+              )
+
+          model_id = os.environ.get('MODEL_ID', 'eleven_multilingual_v2').strip()
+          requested_voice_id = os.environ.get('INPUT_VOICE_ID', '').strip()
+          headers = {
+              'xi-api-key': api_key,
+              'Accept': 'application/json',
+              'User-Agent': 'Somnori-Arina-Pack/1.0',
+          }
+
+          def request_json(url, method='GET', payload=None):
+              data = None
+              req_headers = dict(headers)
+              if payload is not None:
+                  data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                  req_headers['Content-Type'] = 'application/json'
+              req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as resp:
+                      return json.loads(resp.read().decode('utf-8'))
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode('utf-8', errors='replace')
+                  raise RuntimeError(f'ElevenLabs HTTP {exc.code}: {body}') from exc
+
+          # Fail early on account/billing issues and print only non-secret quota metadata.
+          sub = request_json('https://api.elevenlabs.io/v1/user/subscription')
+          print(
+              'ElevenLabs account:',
+              'tier=', sub.get('tier'),
+              'status=', sub.get('status'),
+              'used=', sub.get('character_count'),
+              'limit=', sub.get('character_limit'),
+          )
+
+          voice_id = requested_voice_id
+          candidates = []
+
+          if not voice_id:
+              # Search voices already available to the account first.
+              params = urllib.parse.urlencode({'search': 'Arina', 'page_size': 100})
+              try:
+                  data = request_json('https://api.elevenlabs.io/v2/voices?' + params)
+                  for v in data.get('voices', []):
+                      if (v.get('name') or '').strip().casefold() == 'arina':
+                          candidates.append({
+                              'voice_id': v.get('voice_id'),
+                              'name': v.get('name'),
+                              'category': v.get('category'),
+                              'description': v.get('description'),
+                              'labels': v.get('labels') or {},
+                              'source': 'account',
+                          })
+              except Exception as exc:
+                  print('Account voice search warning:', exc)
+
+          if not voice_id and not candidates:
+              # Paid tiers can use Voice Library voices via API. Search the Russian library.
+              params = urllib.parse.urlencode({
+                  'search': 'Arina',
+                  'language': 'ru',
+                  'page_size': 100,
+              })
+              try:
+                  data = request_json('https://api.elevenlabs.io/v1/shared-voices?' + params)
+                  for v in data.get('voices', []):
+                      if (v.get('name') or '').strip().casefold() == 'arina':
+                          candidates.append({
+                              'voice_id': v.get('voice_id'),
+                              'name': v.get('name'),
+                              'category': v.get('category'),
+                              'description': v.get('descriptive'),
+                              'language': v.get('language'),
+                              'accent': v.get('accent'),
+                              'source': 'voice-library',
+                          })
+              except Exception as exc:
+                  print('Voice Library search warning:', exc)
+
+          if not voice_id:
+              if len(candidates) == 1:
+                  voice_id = candidates[0]['voice_id']
+              else:
+                  print('Arina candidates:', json.dumps(candidates, ensure_ascii=False, indent=2))
+                  raise SystemExit(
+                      'Could not resolve one unique Arina voice. '
+                      'Run again and supply the exact voice_id from ElevenLabs.'
+                  )
+
+          if not voice_id:
+              raise SystemExit('Resolved Arina voice_id is empty.')
+
+          print('Resolved voice:', voice_id, 'model:', model_id)
+
+          generated = []
+          tts_headers = {
+              'xi-api-key': api_key,
+              'Content-Type': 'application/json',
+              'Accept': 'audio/mpeg',
+              'User-Agent': 'Somnori-Arina-Pack/1.0',
+          }
+
+          for index, phrase in enumerate(manifest['phrases'], 1):
+              phrase_id = phrase['id']
+              text = phrase['text']
+              url = (
+                  'https://api.elevenlabs.io/v1/text-to-speech/'
+                  + urllib.parse.quote(voice_id, safe='')
+                  + '?output_format=mp3_44100_128'
+              )
+              payload = json.dumps({
+                  'text': text,
+                  'model_id': model_id,
+              }, ensure_ascii=False).encode('utf-8')
+              req = urllib.request.Request(url, data=payload, headers=tts_headers, method='POST')
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as resp:
+                      audio = resp.read()
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode('utf-8', errors='replace')
+                  raise RuntimeError(
+                      f'Generation failed for {phrase_id}: HTTP {exc.code}: {body}'
+                  ) from exc
+
+              if len(audio) < 1000:
+                  raise RuntimeError(f'Generated audio for {phrase_id} is unexpectedly small: {len(audio)} bytes')
+
+              filename = f'{index:02d}-{phrase_id}.mp3'
+              path = out / filename
+              path.write_bytes(audio)
+              digest = hashlib.sha256(audio).hexdigest()
+              generated.append({
+                  'id': phrase_id,
+                  'text': text,
+                  'file': filename,
+                  'bytes': len(audio),
+                  'sha256': digest,
+              })
+              print(filename, len(audio), digest)
+
+          resolved = {
+              'pack_id': manifest['pack_id'],
+              'provider': 'ElevenLabs',
+              'voice_name': 'Arina',
+              'voice_id': voice_id,
+              'model_id': model_id,
+              'generated_at_utc': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'files': generated,
+          }
+          (out / 'manifest.json').write_text(
+              json.dumps(resolved, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Show generated files
+        run: |
+          ls -lh voicepacks-out/ru-arina-pilot
+          cat voicepacks-out/ru-arina-pilot/manifest.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-arina-pilot-${{ inputs.model_id }}
+          path: voicepacks-out/ru-arina-pilot
+          retention-days: 14

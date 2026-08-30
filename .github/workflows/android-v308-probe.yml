@@ -1,0 +1,44 @@
+name: Probe Somnori 0.30.8 Arina call sites
+
+on:
+  push:
+    branches: [ agent/v0-30-8-arina-runtime ]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore exact Somnori 0.30.6 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v306-voice-lab.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.30.5 source',
+              'Apply Voice Lab and shared TTS profile',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v308-probe-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+      - name: Show voice call sites only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd buildsrc/quiet-diary
+          for f in app/src/main/java/com/quietdiary/app/NightCaptureService.java app/src/main/java/com/quietdiary/app/WakeAlarmActivity.java; do
+            echo "===== $f ====="
+            grep -n -B 8 -A 14 -E 'tts\.speak|speak\(|announce|time|Будильник|запис|Сейчас|Хорошо|Доброе утро' "$f" || true
+          done
