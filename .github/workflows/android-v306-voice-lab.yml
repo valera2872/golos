@@ -1,0 +1,208 @@
+name: Build Somnori 0.30.6 Voice Lab
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact Somnori 0.30.5 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap, subprocess
+          src = Path('.github/workflows/android-v305-ru-ui-state-reliability.yml').read_text(encoding='utf-8').splitlines()
+          for n, name in enumerate([
+              'Restore exact Somnori 0.30.4 source',
+              'Apply RU UI and training-state reliability fixes',
+          ], 1):
+              marker = f'      - name: {name}'
+              start = src.index(marker)
+              run_line = next(i for i in range(start, len(src)) if src[i].strip() == 'run: |')
+              end = next(i for i in range(run_line + 1, len(src)) if src[i].startswith('      - ') and i > run_line + 1)
+              script = textwrap.dedent('\n'.join(src[run_line + 1:end])) + '\n'
+              p = Path(f'/tmp/v306-base-{n}.sh')
+              p.write_text(script, encoding='utf-8')
+              subprocess.run(['bash', str(p)], check=True)
+          PY
+
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30050' app/build.gradle.kts
+          grep -q 'versionName = "0.30.5"' app/build.gradle.kts
+          sha256sum \
+            app/src/main/java/com/quietdiary/app/AcousticWakeDetector.java \
+            app/src/main/java/com/quietdiary/app/RussianAlarmCommandParser.java \
+            app/src/main/java/com/quietdiary/app/GoogleSpeechTranscriber.kt \
+            app/src/main/java/com/quietdiary/app/NightCommandRouter.java \
+            app/src/main/java/com/quietdiary/app/WakeTemplateStore.java \
+            app/src/main/java/com/quietdiary/app/WakeWordTrainer.java \
+            app/src/main/java/com/quietdiary/app/WakePhraseTester.java \
+            app/src/main/java/com/quietdiary/app/CouePracticeService.java \
+            app/src/main/java/com/quietdiary/app/NightProgramService.java \
+            > /tmp/v306-frozen-night-core.sha256
+          cp app/src/main/java/com/quietdiary/app/NightCaptureService.java /tmp/v306-NightCaptureService.before
+          cp app/src/main/java/com/quietdiary/app/WakeAlarmActivity.java /tmp/v306-WakeAlarmActivity.before
+
+      - name: Apply Voice Lab and shared TTS profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 buildsrc/v306/apply_v306.py
+          cd buildsrc/quiet-diary
+          grep -q 'versionCode = 30060' app/build.gradle.kts
+          grep -q 'versionName = "0.30.6-voice-lab"' app/build.gradle.kts
+          sha256sum -c /tmp/v306-frozen-night-core.sha256
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, xml.etree.ElementTree as ET
+          root = Path('app/src/main')
+          for p in (root/'res').rglob('*.xml'):
+              ET.parse(p)
+
+          manifest = (root/'AndroidManifest.xml').read_text(encoding='utf-8')
+          settings_xml = (root/'res/layout/activity_settings.xml').read_text(encoding='utf-8')
+          voice_xml = (root/'res/layout/activity_voice_lab.xml').read_text(encoding='utf-8')
+          settings_java = (root/'java/com/quietdiary/app/SettingsActivity.java').read_text(encoding='utf-8')
+          voice_java = (root/'java/com/quietdiary/app/VoiceLabActivity.java').read_text(encoding='utf-8')
+          profile_java = (root/'java/com/quietdiary/app/SomnoriTtsProfile.java').read_text(encoding='utf-8')
+
+          assert 'android:name=".VoiceLabActivity"' in manifest
+          assert 'openVoiceLabButton' in settings_xml and 'Тест голоса Somnori' in settings_xml
+          assert 'VoiceLabActivity.class' in settings_java
+          for required in ['voiceLabPrevButton', 'voiceLabNextButton', 'voiceLabRateSeek', 'voiceLabPitchSeek',
+                           'voiceLabTimeButton', 'voiceLabWakeButton', 'voiceLabCustomText', 'voiceLabApplyButton']:
+              assert required in voice_xml, required
+          assert 'russianVoices' in profile_java
+          assert '!voice.isNetworkConnectionRequired()' in profile_java
+          assert 'SomnoriTtsProfile.save' in voice_java
+          assert 'currentWakePhrase()' in voice_java
+
+          def strip_night_voice(text):
+              pattern = re.compile(r'    /\*\* Chooses.*?\*/\n    private int configureSomnoriVoice\(TextToSpeech active\) \{.*?\n    \}\n\n    private void startAlarmVoiceDialog\(\)', re.S)
+              normalized, count = pattern.subn('    <VOICE_PROFILE>\n\n    private void startAlarmVoiceDialog()', text, count=1)
+              assert count == 1
+              return normalized
+
+          def strip_wake_tts(text):
+              pattern = re.compile(r'    private void initTts\(\) \{.*?\n    \}\n\n    private void morningSetting\(\)', re.S)
+              normalized, count = pattern.subn('    <WAKE_TTS_PROFILE>\n\n    private void morningSetting()', text, count=1)
+              assert count == 1
+              return normalized
+
+          before_night = Path('/tmp/v306-NightCaptureService.before').read_text(encoding='utf-8')
+          after_night = (root/'java/com/quietdiary/app/NightCaptureService.java').read_text(encoding='utf-8')
+          assert strip_night_voice(before_night) == strip_night_voice(after_night), 'NightCaptureService changed outside TTS chooser'
+
+          before_wake = Path('/tmp/v306-WakeAlarmActivity.before').read_text(encoding='utf-8')
+          after_wake = (root/'java/com/quietdiary/app/WakeAlarmActivity.java').read_text(encoding='utf-8')
+          assert strip_wake_tts(before_wake) == strip_wake_tts(after_wake), 'WakeAlarmActivity changed outside TTS init'
+
+          assert 'SomnoriTtsProfile.configure(getApplicationContext(), active)' in after_night
+          assert 'SomnoriTtsProfile.configure(this, tts)' in after_wake
+          print('0.30.6 Voice Lab guards: OK')
+          PY
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Unit tests and APK
+        shell: bash
+        run: gradle -p buildsrc/quiet-diary testDebugUnitTest :app:assembleDebug --stacktrace --console=plain
+
+      - name: Prepare integrated artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-0.30.6-voice-lab-debug.apk
+          cd buildsrc
+          zip -qr ../Somnori-0.30.6-voice-lab-source.zip quiet-diary
+
+      - name: Build install-alongside Voice Lab
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('buildsrc/quiet-diary')
+
+          build = root/'app/build.gradle.kts'
+          text = build.read_text(encoding='utf-8')
+          assert 'applicationId = "com.quietdiary.app"' in text
+          text = text.replace('applicationId = "com.quietdiary.app"', 'applicationId = "com.quietdiary.app.voicelab"', 1)
+          text = text.replace('versionName = "0.30.6-voice-lab"', 'versionName = "0.30.6-voice-lab-standalone"', 1)
+          build.write_text(text, encoding='utf-8')
+
+          manifest = root/'app/src/main/AndroidManifest.xml'
+          text = manifest.read_text(encoding='utf-8')
+          text = text.replace('android:label="Somnori"', 'android:label="Somnori Voice Lab"', 1)
+          old_voice = '        <activity android:name=".VoiceLabActivity" android:exported="false" />'
+          new_voice = '''        <activity android:name=".VoiceLabActivity" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n        </activity>'''
+          assert old_voice in text
+          text = text.replace(old_voice, new_voice, 1)
+          main_pattern = re.compile(r'''        <activity\n            android:name="\.MainActivity"\n            android:exported="true">\n            <intent-filter>\n                <action android:name="android\.intent\.action\.MAIN" />\n                <category android:name="android\.intent\.category\.LAUNCHER" />\n            </intent-filter>\n        </activity>''')
+          text, count = main_pattern.subn('        <activity android:name=".MainActivity" android:exported="false" />', text, count=1)
+          assert count == 1
+          manifest.write_text(text, encoding='utf-8')
+
+          voice = root/'app/src/main/java/com/quietdiary/app/VoiceLabActivity.java'
+          text = voice.read_text(encoding='utf-8')
+          text = text.replace('Использовать этот голос в Somnori', 'Запомнить этот вариант в тестере')
+          text = text.replace('Голос сохранён. Он будет использоваться временем и будильником.', 'Вариант сохранён в тестере. Пришлите мне имя голоса и параметры.')
+          text = text.replace('Сейчас выбрано для Somnori: ', 'Сейчас выбрано в тестере: ')
+          voice.write_text(text, encoding='utf-8')
+
+          layout = root/'app/src/main/res/layout/activity_voice_lab.xml'
+          text = layout.read_text(encoding='utf-8')
+          text = text.replace('Сохранённый профиль применяется к голосу времени и к тексту будильника при следующем запуске этих функций.',
+                              'Это отдельный безопасный тестер. Он не меняет установленный Somnori; запомните имя понравившегося голоса, скорость и высоту.')
+          layout.write_text(text, encoding='utf-8')
+
+          assert 'com.quietdiary.app.voicelab' in build.read_text(encoding='utf-8')
+          assert 'Somnori Voice Lab' in manifest.read_text(encoding='utf-8')
+          assert manifest.read_text(encoding='utf-8').count('android.intent.category.LAUNCHER') == 1
+          print('Standalone Voice Lab variant prepared')
+          PY
+          gradle -p buildsrc/quiet-diary :app:assembleDebug --stacktrace --console=plain
+          APK=buildsrc/quiet-diary/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          cp "$APK" Somnori-Voice-Lab-standalone-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.6-voice-lab-debug-apk
+          path: Somnori-0.30.6-voice-lab-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-voice-lab-standalone-debug-apk
+          path: Somnori-Voice-Lab-standalone-debug.apk
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: somnori-0.30.6-voice-lab-source
+          path: Somnori-0.30.6-voice-lab-source.zip
+          retention-days: 14

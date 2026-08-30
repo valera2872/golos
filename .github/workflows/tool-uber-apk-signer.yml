@@ -1,0 +1,28 @@
+name: Fetch Uber APK Signer
+
+on:
+  pull_request:
+    branches: [ agent/v0-30-5-ru-ui-state-reliability ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 \
+            https://github.com/patrickfav/uber-apk-signer/releases/download/v1.3.0/uber-apk-signer-1.3.0.jar \
+            -o uber-apk-signer.jar
+          echo 'e1299fd6fcf4da527dd53735b56127e8ea922a321128123b9c32d619bba1d835  uber-apk-signer.jar' | sha256sum -c -
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uber-apk-signer-1.3.0
+          path: uber-apk-signer.jar
+          retention-days: 1
